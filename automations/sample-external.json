@@ -1,0 +1,10 @@
+{
+  "name": "SampleExternal",
+  "description": "Ejemplo de proceso externo (desactivado por defecto).",
+  "cron": "0 30 * * * ?",
+  "kind": "ExternalProcess",
+  "command": "scripts/sample-automation.cmd",
+  "arguments": "",
+  "workingDirectory": ".",
+  "enabled": false
+}

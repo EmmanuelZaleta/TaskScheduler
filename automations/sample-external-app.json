@@ -1,0 +1,11 @@
+{
+  "name": "SampleExternalApp",
+  "description": "Ejemplo que ejecuta el EXE externo desacoplado.",
+  "cron": "0 0/10 * * * ?",
+  "kind": "ExternalProcess",
+  "command": "../scripts/run-sample-external-app.cmd",
+  "workingDirectory": "..",
+  "showWindow": true,
+  "enabled": false
+}
+

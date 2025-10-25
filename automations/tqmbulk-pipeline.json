@@ -1,0 +1,10 @@
+{
+  "name": "TqmbulkPipeline",
+  "description": "Ejecuta la pipeline TQMBULK usando el Automation CLI.",
+  "cron": "0 0/5 * * * ?",
+  "kind": "ExternalProcess",
+  "command": "../scripts/run-tqmbulk-pipeline.cmd",
+  "showWindow": true,
+  "workingDirectory": "..",
+  "enabled": true
+}
