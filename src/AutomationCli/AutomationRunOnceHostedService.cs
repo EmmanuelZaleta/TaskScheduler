@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Listener;
+using YCC.SapAutomation.Abstractions.Automation;
 using YCC.SapAutomation.Application.Automation;
 
 namespace YCC.SapAutomation.AutomationCli;

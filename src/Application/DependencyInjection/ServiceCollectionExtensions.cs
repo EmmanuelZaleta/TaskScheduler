@@ -1,11 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Quartz;
-using YCC.SapAutomation.Abstractions.Automation;
-using YCC.SapAutomation.Abstractions.DbScheduling;
-using YCC.SapAutomation.Abstractions.Options;
 using YCC.SapAutomation.Application.Automation;
+using YCC.SapAutomation.Application.DbScheduling;
+using YCC.SapAutomation.Abstractions.Options;
 using YCC.SapAutomation.Application.Jobs.ExternalProcess;
 
 namespace YCC.SapAutomation.Application.DependencyInjection
