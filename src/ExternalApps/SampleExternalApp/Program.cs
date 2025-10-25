@@ -22,7 +22,7 @@ internal static class Program
     if (!string.IsNullOrWhiteSpace(parsed.Title))
       Console.Title = parsed.Title;
     else
-      Console.Title = $"SampleExternalApp PID={Environment.ProcessId} {DateTime.Now:HH:mm:ss}";
+      Console.Title = $"SampleExternalApp PID={Process.GetCurrentProcess().Id} {DateTime.Now:HH:mm:ss}";
 
     var greeting = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_GREETING") ?? "Hola";
     Console.ForegroundColor = ConsoleColor.Cyan;
