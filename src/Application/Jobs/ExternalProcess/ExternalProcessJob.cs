@@ -1,4 +1,8 @@
-using System.Diagnostics;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Quartz;
 
@@ -36,7 +40,6 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
       if (!string.IsNullOrWhiteSpace(showWindowRaw))
         bool.TryParse(showWindowRaw, out showWindow);
 
-      // Parse env vars (JSON)
       Dictionary<string, string>? envDict = null;
       if (!string.IsNullOrWhiteSpace(environmentJson))
       {
@@ -44,101 +47,18 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
         catch (Exception ex) { _logger.LogWarning(ex, "No se pudieron cargar variables de entorno para el proceso externo."); }
       }
 
-      var hasEnv = envDict != null && envDict.Count > 0;
-      var wd = string.IsNullOrWhiteSpace(workingDirectory) ? Directory.GetCurrentDirectory() : workingDirectory;
+      var request = new ExternalProcessCommand(
+        command,
+        arguments,
+        workingDirectory ?? Directory.GetCurrentDirectory(),
+        showWindow,
+        envDict);
 
-      ProcessStartInfo startInfo;
+      var exitCode = await ExternalProcessExecutor.RunAsync(request, _logger, context.CancellationToken);
 
-      if (showWindow && hasEnv)
+      if (exitCode != 0)
       {
-        // Abrir nueva ventana respetando variables de entorno:
-        // cmd.exe /c set VAR=... && ... && start "title" /D "wd" /wait "command" args
-        var title = Path.GetFileNameWithoutExtension(command);
-        var sb = new System.Text.StringBuilder();
-        foreach (var kv in envDict!)
-        {
-          sb.Append("set \"").Append(kv.Key).Append("=").Append(kv.Value?.Replace("\"", "\\\"") ?? string.Empty).AppendLine("\"");
-          sb.Append("&& ");
-        }
-        sb.Append("start \"").Append(title).Append("\" /D \"").Append(wd).Append("\" /wait \"")
-          .Append(command).Append("\"");
-        if (!string.IsNullOrWhiteSpace(arguments)) sb.Append(" ").Append(arguments);
-
-        startInfo = new ProcessStartInfo
-        {
-          FileName = "cmd.exe",
-          Arguments = "/c " + sb.ToString(),
-          WorkingDirectory = wd,
-          UseShellExecute = false,
-          RedirectStandardError = false,
-          RedirectStandardOutput = false,
-          CreateNoWindow = false,
-          WindowStyle = ProcessWindowStyle.Normal
-        };
-      }
-      else
-      {
-        startInfo = new ProcessStartInfo
-        {
-          FileName = command,
-          Arguments = arguments,
-          WorkingDirectory = wd,
-          UseShellExecute = showWindow,
-          RedirectStandardError = !showWindow,
-          RedirectStandardOutput = !showWindow,
-          CreateNoWindow = !showWindow
-        };
-
-        if (!startInfo.UseShellExecute && hasEnv)
-        {
-          foreach (var (key, value) in envDict!) startInfo.Environment[key] = value;
-        }
-      }
-
-      using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-
-      var outputBuilder = new List<string>();
-      var errorBuilder = new List<string>();
-
-      // Solo capturamos salida si realmente hay redireccion configurada
-      var capture = !startInfo.UseShellExecute && (startInfo.RedirectStandardOutput || startInfo.RedirectStandardError);
-      if (capture)
-      {
-        process.OutputDataReceived += (_, args) =>
-        {
-          if (!string.IsNullOrEmpty(args.Data))
-            outputBuilder.Add(args.Data);
-        };
-        process.ErrorDataReceived += (_, args) =>
-        {
-          if (!string.IsNullOrEmpty(args.Data))
-            errorBuilder.Add(args.Data);
-        };
-      }
-
-      _logger.LogInformation("Ejecutando proceso externo: {Command} {Arguments} (wd={WD})", command, arguments, startInfo.WorkingDirectory);
-      process.Start();
-      if (capture)
-      {
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-      }
-
-      await process.WaitForExitAsync(context.CancellationToken);
-
-      if (!showWindow && outputBuilder.Count > 0)
-      {
-        _logger.LogInformation("Salida proceso externo:\n{Output}", string.Join(Environment.NewLine, outputBuilder));
-      }
-
-      if (!showWindow && errorBuilder.Count > 0)
-      {
-        _logger.LogWarning("Error proceso externo:\n{Error}", string.Join(Environment.NewLine, errorBuilder));
-      }
-
-      if (process.ExitCode != 0)
-      {
-        throw new InvalidOperationException($"El proceso externo finalizo con codigo {process.ExitCode}.");
+        throw new InvalidOperationException($"El proceso externo finalizo con codigo {exitCode}.");
       }
     }
   }

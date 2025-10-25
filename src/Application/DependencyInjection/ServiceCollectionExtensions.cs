@@ -5,6 +5,7 @@ using YCC.SapAutomation.Application.Automation;
 using YCC.SapAutomation.Application.DbScheduling;
 using YCC.SapAutomation.Abstractions.Options;
 using YCC.SapAutomation.Application.Jobs.ExternalProcess;
+using YCC.SapAutomation.Application.Sap;
 
 namespace YCC.SapAutomation.Application.DependencyInjection
 {
@@ -62,6 +63,7 @@ namespace YCC.SapAutomation.Application.DependencyInjection
 
       services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
       services.AddHostedService<DbAutomationSchedulingHostedService>();
+      services.AddHostedService<SapBootstrapHostedService>();
 
       return services;
     }
