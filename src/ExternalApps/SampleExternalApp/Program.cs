@@ -1,13 +1,22 @@
+using System;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Threading;
 
 [SupportedOSPlatform("windows")]
 internal static class Program
 {
   public static int Main(string[] args)
   {
+    if (!OperatingSystem.IsWindows())
+    {
+      Console.Error.WriteLine("YCC.SampleExternalApp solo puede ejecutarse en Windows.");
+      return 1;
+    }
+
     var parsed = ParseArgs(args);
 
     if (!string.IsNullOrWhiteSpace(parsed.Title))
@@ -122,15 +131,17 @@ internal static class Program
       { sapTimeoutSeconds = timeout; i++; continue; }
     }
 
-    var sapOptions = new SapLoginOptions(
-      sapEnabled,
-      sapSystem,
-      sapClient,
-      sapUser,
-      sapPassword,
-      sapLang,
-      sapGuiPath,
-      sapTimeoutSeconds < 5 ? 5 : sapTimeoutSeconds);
+    var sapOptions = new SapLoginOptions
+    {
+      Enabled = sapEnabled,
+      SystemDescription = sapSystem,
+      Client = sapClient,
+      User = sapUser,
+      Password = sapPassword,
+      Language = sapLang,
+      SapGuiPath = sapGuiPath,
+      StartupTimeoutSeconds = sapTimeoutSeconds < 5 ? 5 : sapTimeoutSeconds
+    };
 
     return new ParsedArgs(sleep, write, exit, hold, title, sapOptions);
   }
@@ -407,21 +418,47 @@ internal static class Program
 
   private static string Timestamp() => $"[{DateTime.Now:HH:mm:ss}]";
 
-  private sealed record ParsedArgs(
-    int SleepSeconds,
-    string WritePath,
-    int ExitCode,
-    int HoldSeconds,
-    string? Title,
-    SapLoginOptions Sap);
+  private sealed class ParsedArgs
+  {
+    public ParsedArgs(int sleepSeconds, string writePath, int exitCode, int holdSeconds, string? title, SapLoginOptions sap)
+    {
+      SleepSeconds = sleepSeconds;
+      WritePath = writePath;
+      ExitCode = exitCode;
+      HoldSeconds = holdSeconds;
+      Title = title;
+      Sap = sap;
+    }
 
-  private sealed record SapLoginOptions(
-    bool Enabled,
-    string SystemDescription,
-    string Client,
-    string User,
-    string Password,
-    string Language,
-    string? SapGuiPath,
-    int StartupTimeoutSeconds);
+    public int SleepSeconds { get; }
+
+    public string WritePath { get; }
+
+    public int ExitCode { get; }
+
+    public int HoldSeconds { get; }
+
+    public string? Title { get; }
+
+    public SapLoginOptions Sap { get; }
+  }
+
+  private sealed class SapLoginOptions
+  {
+    public bool Enabled { get; set; }
+
+    public string SystemDescription { get; set; } = string.Empty;
+
+    public string Client { get; set; } = string.Empty;
+
+    public string User { get; set; } = string.Empty;
+
+    public string Password { get; set; } = string.Empty;
+
+    public string Language { get; set; } = string.Empty;
+
+    public string? SapGuiPath { get; set; }
+
+    public int StartupTimeoutSeconds { get; set; }
+  }
 }
