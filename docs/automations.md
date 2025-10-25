@@ -39,29 +39,29 @@ Ejecutar manifiestos con el CLI
 
 Cuando quieres disparar una automatizacion fuera del servicio Windows (por ejemplo
 desde un scheduler externo), puedes usar el proyecto `src/AutomationCli`. El manifiesto
-`automations/tqmbulk-pipeline.json` es un ejemplo concreto que programa la pipeline
-TQMBULK y apunta al script `scripts/run-tqmbulk-pipeline.cmd`:
+`automations/sample-manifest.json` es un ejemplo que ejecuta un script de prueba a traves
+del comando `scripts/run-sample-automation.cmd`:
 
 ```json
 {
-  "name": "TqmbulkPipeline",
-  "description": "Ejecuta la pipeline TQMBULK usando el CLI de automatizaciones.",
+  "name": "SampleAutomation",
+  "description": "Ejecuta un proceso externo de ejemplo mediante el Automation CLI.",
   "cron": "0 0/5 * * * ?",
   "kind": "ExternalProcess",
-  "command": "../scripts/run-tqmbulk-pipeline.cmd",
+  "command": "../scripts/run-sample-automation.cmd",
   "workingDirectory": "..",
   "enabled": true
 }
 ```
 
 El script detecta el ejecutable publicado (`YCC.SapAutomation.AutomationCli.exe`) y,
-si no recibe argumentos, invoca el manifiesto `automations/tqmbulk-pipeline.json`.
-Puedes sobrescribir la ruta del ejecutable via `TQMBULK_CLI_EXE` o pasar cualquier
+si no recibe argumentos, invoca el manifiesto `automations/sample-manifest.json`.
+Puedes sobrescribir la ruta del ejecutable via `AUTOMATION_CLI_EXE` o pasar cualquier
 argumento admitido por el CLI (por ejemplo `--manifest otra.json --respect-cron`).
 
 ```cmd
-set "SAP_LAUNCHER=C:\Tools\SapScriptLauncher\SapScriptLauncher.exe"
-set "PIPELINE_ARGS=--run TQMBULK --from 2024-10-01 --to 2024-10-02"
+set "AUTOMATION_CLI_EXE=C:\Tools\AutomationCli\YCC.SapAutomation.AutomationCli.exe"
+set "PIPELINE_ARGS=--run Sample --from 2024-10-01 --to 2024-10-02"
 ```
 
 Luego reinicia el servicio Windows (o ejecuta la aplicacion en consola) para que la
@@ -73,10 +73,10 @@ Agregar mas pipelines externas
 
 1. Publica el proyecto CLI: `dotnet publish src/AutomationCli -c Release -r win-x64`.
    (puedes cambiar el RuntimeIdentifier segun el servidor donde se ejecute).
-2. Copia `automations/tqmbulk-pipeline.json` y renombralo (por ejemplo
-   `automations/lqua-pipeline.json`).
+2. Copia `automations/sample-manifest.json` y renombralo (por ejemplo
+   `automations/mi-pipeline.json`).
 3. Ajusta el `cron`, `command`, `arguments` y `description` segun corresponda. El script
-   por defecto invoca el ejecutable publicado en `src\AutomationCli\bin\Release\...`.
+   por defecto invoca el ejecutable publicado en `src\\AutomationCli\\bin\\Release\\...`.
 4. Si la pipeline requiere parametros especiales, pasalos al script (se reenvian al exe).
 5. Reinicia el host para que los manifiestos se vuelvan a registrar.
 
@@ -99,7 +99,7 @@ El CLI acepta estas opciones:
 Ejemplos:
 
 - Ejecutar un manifiesto puntual y terminar:
-  `YCC.SapAutomation.AutomationCli.exe --manifest "C:\manifests\tqmbulk.json"`
+  `YCC.SapAutomation.AutomationCli.exe --manifest "C:\manifests\sample.json"`
 
 - Ejecutar todo lo que este en una carpeta de manifiestos:
   `YCC.SapAutomation.AutomationCli.exe --manifestsPath "C:\manifests"`
