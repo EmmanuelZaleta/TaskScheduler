@@ -1,0 +1,9 @@
+{
+  "name": "SampleAutomation",
+  "description": "Ejecuta un proceso externo de ejemplo mediante el Automation CLI.",
+  "cron": "0 0/5 * * * ?",
+  "kind": "ExternalProcess",
+  "command": "../scripts/run-sample-automation.cmd",
+  "workingDirectory": "..",
+  "enabled": true
+}
