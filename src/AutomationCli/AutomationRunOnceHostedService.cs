@@ -194,6 +194,7 @@ internal sealed class AutomationRunOnceHostedService : IHostedService
     private readonly HashSet<string> _targetJobNames;
     private readonly TaskCompletionSource<bool> _tcs;
     private readonly HashSet<string> _completed = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _lock = new();
 
     public CompletionListener(HashSet<string> targetJobNames, TaskCompletionSource<bool> tcs)
     {
@@ -211,8 +212,17 @@ internal sealed class AutomationRunOnceHostedService : IHostedService
         return Task.CompletedTask;
       }
 
-      // Tolerante a fallos: contar como terminado aunque falle.
-      _completed.Add(jobName);
+      lock (_lock)
+      {
+        // Tolerante a fallos: contar como terminado aunque falle.
+        _completed.Add(jobName);
+
+        if (_completed.IsSupersetOf(_targetJobNames))
+        {
+          _tcs.TrySetResult(true);
+        }
+      }
+
       return Task.CompletedTask;
     }
   }
