@@ -1,3 +1,5 @@
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Serilog;
@@ -11,14 +13,21 @@ var runAsService = WindowsServiceHelpers.IsWindowsService() &&
                    !args.Any(a => string.Equals(a, "--console", StringComparison.OrdinalIgnoreCase));
 
 if (runAsService)
-  builder = builder.UseWindowsService();
+  builder = builder.UseWindowsService(options => options.ServiceName = "YCC Sap Automation Host");
 else
   builder = builder.UseConsoleLifetime();
 
 builder
+  .UseSystemd()
   .UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration))
   .ConfigureServices((ctx, services) =>
   {
+    services.Configure<HostOptions>(options =>
+    {
+      options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+      options.ShutdownTimeout = TimeSpan.FromSeconds(30);
+    });
+
     services
       .AddApplicationLayer(ctx.Configuration)
       .AddSqlInfrastructure(ctx.Configuration)
