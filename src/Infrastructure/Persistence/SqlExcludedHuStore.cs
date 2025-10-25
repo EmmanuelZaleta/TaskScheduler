@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using System.Collections.Generic;
 using System.Data;
 using YCC.SapAutomation.Abstractions.Storage;
 using YCC.SapAutomation.Infrastructure.Sql;
@@ -11,6 +12,29 @@ namespace YCC.SapAutomation.Infrastructure.Persistence
 
     public SqlExcludedHuStore(IDbConnectionFactory connectionFactory) =>
       _connectionFactory = connectionFactory;
+
+    public async Task<IReadOnlySet<string>> LoadAsync(CancellationToken cancellationToken = default)
+    {
+      await using var connection = _connectionFactory.Create();
+      await connection.OpenAsync(cancellationToken);
+      await using var command = connection.CreateCommand();
+
+      command.CommandText = "SELECT HU FROM dbo.ExcludedHU WITH (READPAST)";
+
+      var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+      {
+        while (await reader.ReadAsync(cancellationToken))
+        {
+          if (!reader.IsDBNull(0))
+          {
+            result.Add(reader.GetString(0));
+          }
+        }
+      }
+
+      return result;
+    }
 
     public async Task<bool> IsExcludedAsync(string handlingUnit, CancellationToken cancellationToken = default)
     {
