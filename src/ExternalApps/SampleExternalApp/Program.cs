@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
+[SupportedOSPlatform("windows")]
 internal static class Program
 {
   public static int Main(string[] args)
@@ -138,9 +140,9 @@ internal static class Program
     Console.WriteLine($"{Timestamp()} Preparando login en SAP GUI para \"{options.SystemDescription}\" como usuario {options.User}...");
 
     object? rotEntry = null;
-    object? application = null;
-    object? connection = null;
-    object? session = null;
+    dynamic application = null;
+    dynamic connection = null;
+    dynamic session = null;
 
     try
     {
@@ -164,9 +166,9 @@ internal static class Program
     }
     finally
     {
-      ReleaseComObject(session);
-      ReleaseComObject(connection);
-      ReleaseComObject(application);
+      ReleaseComObject((object?)session);
+      ReleaseComObject((object?)connection);
+      ReleaseComObject((object?)application);
       ReleaseComObject(rotEntry);
     }
   }
