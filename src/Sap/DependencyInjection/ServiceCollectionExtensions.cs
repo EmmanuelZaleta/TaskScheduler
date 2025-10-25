@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using YCC.SapAutomation.Sap.Options;
 
 namespace YCC.SapAutomation.Sap.DependencyInjection
