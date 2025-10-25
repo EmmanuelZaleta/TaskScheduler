@@ -2,9 +2,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Quartz;
-using YCC.SapAutomation.Application.Abstractions;
+using YCC.SapAutomation.Abstractions.DbScheduling;
+using YCC.SapAutomation.Abstractions.Options;
 using YCC.SapAutomation.Application.Jobs.ExternalProcess;
-using YCC.SapAutomation.Application.Options;
 
 namespace YCC.SapAutomation.Application.DbScheduling;
 
@@ -156,7 +156,6 @@ public sealed class DbAutomationSchedulingHostedService : IHostedService
   private string ResolveDefaultCommand(string operationCode)
   {
     // Intenta mapear via appsettings: Automation:DbCommandMap:{code}:{command,arguments,workingDirectory}
-    var section = _autoOptions.CurrentValue?.ManifestsPath; // unused here; keep method simple
     // Por defecto: intenta scripts/<code>.cmd relativo al ContentRoot.
     var guess = System.IO.Path.Combine(_env.ContentRootPath, "scripts", operationCode + ".cmd");
     return guess;

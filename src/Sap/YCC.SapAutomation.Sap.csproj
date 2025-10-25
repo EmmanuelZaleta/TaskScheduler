@@ -11,7 +11,7 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\\Application\\YCC.SapAutomation.Application.csproj" />
+    <ProjectReference Include="..\\Abstractions\\YCC.SapAutomation.Abstractions.csproj" />
     <ProjectReference Include="..\\Domain\\YCC.SapAutomation.Domain.csproj" />
   </ItemGroup>
 </Project>

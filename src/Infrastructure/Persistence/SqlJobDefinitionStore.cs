@@ -1,6 +1,6 @@
 using Microsoft.Data.SqlClient;
 using System.Data;
-using YCC.SapAutomation.Application.DbScheduling;
+using YCC.SapAutomation.Abstractions.DbScheduling;
 using YCC.SapAutomation.Infrastructure.Sql;
 
 namespace YCC.SapAutomation.Infrastructure.Persistence;

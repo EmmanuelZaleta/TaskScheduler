@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
-using YCC.SapAutomation.Application.Abstractions;
-using YCC.SapAutomation.Application.Options;
+using YCC.SapAutomation.Abstractions.Tqmbulk;
 using YCC.SapAutomation.Domain.Tqmbulk;
+using YCC.SapAutomation.Sap.Options;
 
 namespace YCC.SapAutomation.Sap.Adapters
 {

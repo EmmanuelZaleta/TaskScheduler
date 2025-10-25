@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
+using YCC.SapAutomation.Abstractions.Automation;
 
 namespace YCC.SapAutomation.Application.Automation
 {

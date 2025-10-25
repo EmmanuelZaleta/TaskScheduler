@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using YCC.SapAutomation.Application.Automation;
-using YCC.SapAutomation.Application.Options;
+using YCC.SapAutomation.Abstractions.Automation;
+using YCC.SapAutomation.Abstractions.Options;
 
 namespace YCC.SapAutomation.Infrastructure.Automation
 {

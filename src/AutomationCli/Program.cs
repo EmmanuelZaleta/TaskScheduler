@@ -4,8 +4,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using Serilog;
+using YCC.SapAutomation.Abstractions.Options;
 using YCC.SapAutomation.Application.DependencyInjection;
-using YCC.SapAutomation.Application.Options;
 using YCC.SapAutomation.Infrastructure.DependencyInjection;
 using YCC.SapAutomation.Sap.DependencyInjection;
 
@@ -39,7 +39,7 @@ internal static class Program
       .AddSapAdapters(builder.Configuration);
 
     // Permite sobreescribir la carpeta de manifiestos desde CLI (--manifestsPath)
-    builder.Services.PostConfigure<YCC.SapAutomation.Application.Options.AutomationOptions>(opt =>
+      builder.Services.PostConfigure<AutomationOptions>(opt =>
     {
       if (!string.IsNullOrWhiteSpace(cliOptions.ManifestsPath))
       {

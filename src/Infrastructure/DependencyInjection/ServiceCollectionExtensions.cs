@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using YCC.SapAutomation.Application.Automation;
-using YCC.SapAutomation.Application.Abstractions;
-using YCC.SapAutomation.Application.DbScheduling;
 using YCC.SapAutomation.Domain.Common;
 using YCC.SapAutomation.Infrastructure.Common;
 using YCC.SapAutomation.Infrastructure.Persistence;
 using YCC.SapAutomation.Infrastructure.Sql;
 using YCC.SapAutomation.Infrastructure.Automation;
+using YCC.SapAutomation.Abstractions.Automation;
+using YCC.SapAutomation.Abstractions.DbScheduling;
+using YCC.SapAutomation.Abstractions.Storage;
+using YCC.SapAutomation.Abstractions.Tqmbulk;
 
 namespace YCC.SapAutomation.Infrastructure.DependencyInjection
 {
