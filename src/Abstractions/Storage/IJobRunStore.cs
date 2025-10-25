@@ -2,6 +2,6 @@ namespace YCC.SapAutomation.Abstractions.Storage;
 
 public interface IJobRunStore
 {
-  Task RegisterAsync(string jobName, DateTimeOffset startedAt, DateTimeOffset? finishedAt = null, bool succeeded = true,
-                     string? message = null, CancellationToken cancellationToken = default);
+  Task<long> StartAsync(string jobName, CancellationToken cancellationToken = default);
+  Task CompleteAsync(long jobRunId, string status, string? message = null, CancellationToken cancellationToken = default);
 }

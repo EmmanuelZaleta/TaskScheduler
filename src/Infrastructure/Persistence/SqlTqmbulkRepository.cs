@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using System.Data;
+using System.Linq;
 using YCC.SapAutomation.Abstractions.Tqmbulk;
 using YCC.SapAutomation.Domain.Tqmbulk;
 using YCC.SapAutomation.Infrastructure.Sql;
@@ -13,9 +14,12 @@ namespace YCC.SapAutomation.Infrastructure.Persistence
     public SqlTqmbulkRepository(IDbConnectionFactory connectionFactory) =>
       _connectionFactory = connectionFactory;
 
-    public async Task UpsertAsync(IEnumerable<TqmbulkEntry> entries, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(TqmbulkBatch batch, CancellationToken cancellationToken = default)
     {
-      var materializedEntries = entries as IList<TqmbulkEntry> ?? entries.ToList();
+      if (batch is null)
+        throw new ArgumentNullException(nameof(batch));
+
+      var materializedEntries = batch.Entries as IList<TqmbulkEntry> ?? batch.Entries.ToList();
       if (materializedEntries.Count == 0)
       {
         return;
