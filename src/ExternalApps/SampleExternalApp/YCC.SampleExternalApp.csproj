@@ -1,16 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFrameworks>net6.0-windows7.0;net8.0-windows</TargetFrameworks>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+		<!-- Opción A: fija versión de Windows (recomendada por tu error) -->
+		<TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
 
-  <ItemGroup>
-    <Reference Include="Microsoft.CSharp" />
-  </ItemGroup>
+		<!-- Opción B (si no necesitas una versión exacta):
+    <TargetFramework>net8.0-windows</TargetFramework>
+    -->
 
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 </Project>
