@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Quartz;
+using YCC.SapAutomation.Abstractions.Automation;
+using YCC.SapAutomation.Abstractions.DbScheduling;
+using YCC.SapAutomation.Abstractions.Options;
 using YCC.SapAutomation.Application.Automation;
 using YCC.SapAutomation.Application.Jobs.ExternalProcess;
-using YCC.SapAutomation.Application.Options;
-using YCC.SapAutomation.Application.DbScheduling;
 
 namespace YCC.SapAutomation.Application.DependencyInjection
 {
@@ -13,16 +14,16 @@ namespace YCC.SapAutomation.Application.DependencyInjection
     public static IServiceCollection AddApplicationLayer(this IServiceCollection services, IConfiguration configuration)
     {
       services
-        .AddOptions<SapOptions>()
-        .Bind(configuration.GetSection(SapOptions.SectionName));
-
-      services
         .AddOptions<SchedulerOptions>()
-        .Bind(configuration.GetSection(SchedulerOptions.SectionName));
+        .Bind(configuration.GetSection(SchedulerOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
       services
         .AddOptions<AutomationOptions>()
-        .Bind(configuration.GetSection(AutomationOptions.SectionName));
+        .Bind(configuration.GetSection(AutomationOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
 
       services.AddSingleton<AutomationJobFactory>();
       // No registramos jobs concretos internos; las automatizaciones DotNet

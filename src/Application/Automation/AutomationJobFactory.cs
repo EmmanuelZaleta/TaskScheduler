@@ -4,6 +4,7 @@ using System.Runtime.Loader;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
+using YCC.SapAutomation.Abstractions.Automation;
 using YCC.SapAutomation.Application.Jobs.ExternalProcess;
 
 namespace YCC.SapAutomation.Application.Automation

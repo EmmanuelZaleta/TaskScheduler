@@ -12,7 +12,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\\Application\\YCC.SapAutomation.Application.csproj" />
+    <ProjectReference Include="..\\Abstractions\\YCC.SapAutomation.Abstractions.csproj" />
     <ProjectReference Include="..\\Domain\\YCC.SapAutomation.Domain.csproj" />
   </ItemGroup>
 </Project>

@@ -17,6 +17,7 @@
     <PackageReference Include="Quartz.Extensions.Hosting" Version="3.9.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\\Abstractions\\YCC.SapAutomation.Abstractions.csproj" />
     <ProjectReference Include="..\\Domain\\YCC.SapAutomation.Domain.csproj" />
   </ItemGroup>
 </Project>

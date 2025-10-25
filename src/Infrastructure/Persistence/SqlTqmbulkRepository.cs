@@ -1,6 +1,6 @@
 using Microsoft.Data.SqlClient;
 using System.Data;
-using YCC.SapAutomation.Application.Abstractions;
+using YCC.SapAutomation.Abstractions.Tqmbulk;
 using YCC.SapAutomation.Domain.Tqmbulk;
 using YCC.SapAutomation.Infrastructure.Sql;
 

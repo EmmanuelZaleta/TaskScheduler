@@ -1,6 +1,6 @@
 using Microsoft.Data.SqlClient;
 using System.Data;
-using YCC.SapAutomation.Application.Abstractions;
+using YCC.SapAutomation.Abstractions.Storage;
 using YCC.SapAutomation.Infrastructure.Sql;
 
 namespace YCC.SapAutomation.Infrastructure.Persistence

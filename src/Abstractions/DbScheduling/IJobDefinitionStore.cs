@@ -1,7 +1,6 @@
-namespace YCC.SapAutomation.Application.DbScheduling;
+namespace YCC.SapAutomation.Abstractions.DbScheduling;
 
 public interface IJobDefinitionStore
 {
   Task<IReadOnlyCollection<JobDefinition>> LoadEnabledAsync(CancellationToken cancellationToken);
 }
-
