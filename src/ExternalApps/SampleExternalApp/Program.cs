@@ -1,3 +1,4 @@
+using System.Configuration;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -18,7 +19,7 @@ internal static class Program
                 Console.Title = $"SampleExternalApp PID={Environment.ProcessId} {DateTime.Now:HH:mm:ss}";
         }
 
-        var greeting = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_GREETING") ?? "Hola";
+        var greeting = GetConfigValue("Greeting", "Hola");
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine($"{Timestamp()} {greeting} desde SampleExternalApp.");
         Console.ResetColor();
@@ -84,14 +85,14 @@ internal static class Program
     {
         int sleep = 0; string write = string.Empty; int exit = 0; int hold = 0; string? title = null;
         // SAP GUI solo funciona en Windows - deshabilitado automáticamente en otros sistemas
-        bool sapEnabled = OperatingSystem.IsWindows() && !IsDisabled(Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SKIP_SAP"));
-        string sapSystem = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_SYSTEM") ?? ".YNCA - EQ2 - ERP QA2";
-        string sapClient = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_CLIENT") ?? string.Empty;
-        string sapUser = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_USER") ?? "90022817";
-        string sapPassword = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_PASSWORD") ?? "Yazaki202512345";
-        string sapLang = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_LANG") ?? "ES";
-        string? sapGuiPath = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_GUI_EXE");
-        int sapTimeoutSeconds = TryParseInt(Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_TIMEOUT_SECONDS"), 45);
+        bool sapEnabled = OperatingSystem.IsWindows() && !GetConfigBool("SAP_SkipLogin", false);
+        string sapSystem = GetConfigValue("SAP_System", ".YNCA - EQ2 - ERP QA2");
+        string sapClient = GetConfigValue("SAP_Client", string.Empty);
+        string sapUser = GetConfigValue("SAP_User", "90022817");
+        string sapPassword = GetConfigValue("SAP_Password", "Yazaki202512345");
+        string sapLang = GetConfigValue("SAP_Language", "ES");
+        string? sapGuiPath = GetConfigValue("SAP_GuiPath", null);
+        int sapTimeoutSeconds = GetConfigInt("SAP_TimeoutSeconds", 45);
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -230,7 +231,7 @@ internal static class Program
     {
         var exe = !string.IsNullOrWhiteSpace(options.SapGuiPath)
           ? options.SapGuiPath
-          : Environment.GetEnvironmentVariable("SAP_GUI_EXE") ?? "saplogon.exe";
+          : "saplogon.exe";
 
         Console.WriteLine($"{Timestamp()} Iniciando SAP GUI con \"{exe}\"...");
 
@@ -421,6 +422,28 @@ internal static class Program
     }
 
     private static string Timestamp() => $"[{DateTime.Now:HH:mm:ss}]";
+
+    private static string GetConfigValue(string key, string defaultValue)
+    {
+        var value = ConfigurationManager.AppSettings[key];
+        return string.IsNullOrWhiteSpace(value) ? defaultValue : value;
+    }
+
+    private static int GetConfigInt(string key, int defaultValue)
+    {
+        var value = ConfigurationManager.AppSettings[key];
+        return int.TryParse(value, out var result) ? result : defaultValue;
+    }
+
+    private static bool GetConfigBool(string key, bool defaultValue)
+    {
+        var value = ConfigurationManager.AppSettings[key];
+        if (string.IsNullOrWhiteSpace(value))
+            return defaultValue;
+        return value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("yes", StringComparison.OrdinalIgnoreCase);
+    }
 
     private sealed record ParsedArgs(
       int SleepSeconds,
