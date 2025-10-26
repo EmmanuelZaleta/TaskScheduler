@@ -20,9 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Abstractions\Abstractions.csproj" />
-    <ProjectReference Include="..\Application\Application.csproj" />
-    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
+    <ProjectReference Include="..\Abstractions\YCC.SapAutomation.Abstractions.csproj" />
+    <ProjectReference Include="..\Application\YCC.SapAutomation.Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\YCC.SapAutomation.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
