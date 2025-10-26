@@ -95,19 +95,19 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
 
           if (exitCode != 0)
           {
-            _logger.LogError("El proceso externo finalizó con código de salida {ExitCode}.", exitCode);
+            var errorMessage = $"El proceso finalizó con código de salida {exitCode}";
+            _logger.LogError("=== JOB FALLÓ: {JobName} - {ErrorMessage} - Duración: {Duration}ms ===",
+              jobName, errorMessage, stopwatch.Elapsed.TotalMilliseconds);
 
-            // Notificar fallo
-            await _notificationService.NotifyJobCompletedAsync(
-              jobName,
-              stopwatch.Elapsed,
-              exitCode,
-              $"El proceso finalizó con código de salida {exitCode}");
+            // Notificar fallo con toda la información en un solo registro
+            await _notificationService.NotifyJobFailedAsync(jobName, errorMessage);
 
-            throw new InvalidOperationException($"El proceso externo finalizo con codigo {exitCode}.");
+            // No lanzar excepción - ya se registró el fallo
+            return;
           }
 
-          _logger.LogInformation("=== JOB COMPLETADO EXITOSAMENTE: {JobName} (ExitCode=0) ===", jobName);
+          _logger.LogInformation("=== JOB COMPLETADO EXITOSAMENTE: {JobName} (ExitCode=0) - Duración: {Duration}ms ===",
+            jobName, stopwatch.Elapsed.TotalMilliseconds);
 
           // Notificar éxito
           await _notificationService.NotifyJobCompletedAsync(
@@ -126,8 +126,10 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
       {
         stopwatch.Stop();
 
-        // Notificar fallo por excepción
-        await _notificationService.NotifyJobFailedAsync(jobName, ex.Message);
+        // Solo registrar excepciones reales (no exit codes)
+        _logger.LogError(ex, "=== JOB FALLÓ CON EXCEPCIÓN: {JobName} - Duración: {Duration}ms ===",
+          jobName, stopwatch.Elapsed.TotalMilliseconds);
+        await _notificationService.NotifyJobFailedAsync(jobName, $"Excepción: {ex.Message}");
 
         throw;
       }
