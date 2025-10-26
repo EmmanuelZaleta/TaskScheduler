@@ -1,57 +1,45 @@
+using System;
 using System.Windows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
 using YCC.SapAutomation.Application.DependencyInjection;
 using YCC.SapAutomation.Infrastructure.DependencyInjection;
-using YCC.SapAutomation.Host.Views;
-using YCC.SapAutomation.Host.Utilities;
 
-namespace YCC.SapAutomation.Host;
-
-public partial class App : Application
+namespace YCC.SapAutomation.Host
 {
-  private IHost? _host;
-  private bool _isShuttingDown = false;
-
-  public App()
+  public partial class App : System.Windows.Application
   {
-    InitializeComponent();
-  }
+    private IHost? _host;
 
-  protected override async void OnStartup(StartupEventArgs e)
-  {
-    base.OnStartup(e);
-
-    try
+    protected override async void OnStartup(StartupEventArgs e)
     {
-      // Registrar en Startup de Windows
-      StartupHelper.RegisterInWindowsStartup();
+      base.OnStartup(e);
 
-      // Construir host
-      var builder = Host.CreateApplicationBuilder();
+      var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
 
+      var env = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production";
       builder.Configuration
-        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
-        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production"}.json",
-                     optional: true, reloadOnChange: false)
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddJsonFile($"appsettings.{env}.json", optional: true, reloadOnChange: true)
         .AddEnvironmentVariables();
 
-      builder.Logging.ClearProviders();
-      builder.Logging.AddSerilog(new LoggerConfiguration()
-        .ReadFrom.Configuration(builder.Configuration)
-        .WriteTo.File("logs/jobhost-.log", rollingInterval: RollingInterval.Day)
+      Log.Logger = new LoggerConfiguration()
+        .ReadFrom.Configuration(builder.Configuration, sectionName: "Serilog")
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
         .WriteTo.Debug()
-        .CreateLogger(), dispose: true);
+        .WriteTo.File("logs/jobhost-.log", rollingInterval: RollingInterval.Day)
+        .CreateLogger();
+
+      builder.Logging.ClearProviders();
+      builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
       builder.Services
         .AddApplicationLayer(builder.Configuration)
         .AddSqlInfrastructure(builder.Configuration);
-
-      // Agregar MainWindow como servicio
-      builder.Services.AddSingleton<MainWindow>();
-      builder.Services.AddSingleton<MainWindowViewModel>();
 
       var source = builder.Configuration.GetValue<string>("Automation:Source") ?? "Database";
       if (string.Equals(source, "Database", StringComparison.OrdinalIgnoreCase))
@@ -59,39 +47,34 @@ public partial class App : Application
       else
         builder.Services.AddAutomationRuntime(builder.Configuration);
 
+      // Agregar MainWindow como servicio
+      builder.Services.AddSingleton<Views.MainWindow>();
+      builder.Services.AddSingleton<Views.MainWindowViewModel>();
+
       _host = builder.Build();
+      await _host.StartAsync();
 
-      // Mostrar ventana
-      var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-      mainWindow.Show();
+      // Mostrar ventana principal
+      var win = _host.Services.GetRequiredService<Views.MainWindow>();
+      MainWindow = win;
+      win.Show();
+    }
 
-      // Ejecutar host
-      _ = _host.RunAsync().ContinueWith(_ =>
+    protected override async void OnExit(ExitEventArgs e)
+    {
+      try
       {
-        if (!_isShuttingDown)
+        if (_host is not null)
         {
-          Dispatcher.Invoke(() => Shutdown());
+          await _host.StopAsync(TimeSpan.FromSeconds(5));
+          _host.Dispose();
         }
-      });
+      }
+      finally
+      {
+        Log.CloseAndFlush();
+        base.OnExit(e);
+      }
     }
-    catch (Exception ex)
-    {
-      MessageBox.Show($"Error al iniciar: {ex.Message}\n\n{ex.StackTrace}",
-        "Error Fatal", MessageBoxButton.OK, MessageBoxImage.Error);
-      Shutdown();
-    }
-  }
-
-  protected override async void OnExit(ExitEventArgs e)
-  {
-    _isShuttingDown = true;
-
-    if (_host != null)
-    {
-      await _host.StopAsync(TimeSpan.FromSeconds(5));
-      _host.Dispose();
-    }
-
-    base.OnExit(e);
   }
 }
