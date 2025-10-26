@@ -7,7 +7,12 @@ namespace YCC.SapAutomation.Infrastructure.Sql
     SqlConnection Create();
   }
 
-  public sealed class SqlConnectionFactory : IDbConnectionFactory
+  public interface ISqlConnectionFactory
+  {
+    Task<SqlConnection> CreateAsync(CancellationToken cancellationToken = default);
+  }
+
+  public sealed class SqlConnectionFactory : IDbConnectionFactory, ISqlConnectionFactory
   {
     private readonly string _connectionString;
 
@@ -17,5 +22,12 @@ namespace YCC.SapAutomation.Infrastructure.Sql
     }
 
     public SqlConnection Create() => new SqlConnection(_connectionString);
+
+    public async Task<SqlConnection> CreateAsync(CancellationToken cancellationToken = default)
+    {
+      var connection = new SqlConnection(_connectionString);
+      await connection.OpenAsync(cancellationToken);
+      return connection;
+    }
   }
 }
