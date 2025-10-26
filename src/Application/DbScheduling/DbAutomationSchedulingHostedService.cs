@@ -218,8 +218,8 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
           .Build();
       case "ONCE":
         var rt = d.RunAtTime ?? new TimeSpan(0,0,10);
-        DateTimeOffset startAt = DateTimeOffset.Now.Date.Add(rt);
-        if (startAt < DateTimeOffset.Now) startAt = DateTimeOffset.Now.AddSeconds(5);
+        DateTimeOffset startAt = DateTimeOffset.UtcNow.Date.Add(rt);
+        if (startAt < DateTimeOffset.UtcNow) startAt = DateTimeOffset.UtcNow.AddSeconds(5);
         return TriggerBuilder.Create()
           .WithIdentity($"Trig.{d.JobId}")
           .ForJob(detail)
@@ -343,8 +343,8 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
         if (cachedList.Count > 0)
         {
-          _logger.LogWarning(
-            "🟡 MODO OFFLINE: Usando configuración en cache ({Count} jobs, Última actualización: {Timestamp})",
+          _logger.LogInformation(
+            "✅ MODO OFFLINE: Usando configuración en cache ({Count} jobs, Última actualización: {Timestamp})",
             cachedList.Count,
             _configCache.GetSnapshotTimestamp());
           _isUsingFallback = true;
@@ -352,7 +352,7 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
         }
       }
 
-      _logger.LogError("❌ No hay configuración disponible en cache. El scheduler quedará vacío.");
+      _logger.LogWarning("⚠️ No hay configuración disponible en cache ni en base de datos. El scheduler continuará sin jobs hasta que se restablezca la conexión.");
       _isUsingFallback = true;
       return Array.Empty<JobDefinition>();
     }
