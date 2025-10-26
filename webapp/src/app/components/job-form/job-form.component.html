@@ -1,0 +1,167 @@
+<div class="wpf-window">
+  <div class="wpf-title-bar">
+    <h2>{{ isEditMode ? 'Editar Tarea' : 'Nueva Tarea' }}</h2>
+  </div>
+
+  <div class="wpf-content">
+    <div *ngIf="error" class="wpf-alert error">
+      {{ error }}
+    </div>
+
+    <div *ngIf="success" class="wpf-alert success">
+      {{ success }}
+    </div>
+
+    <form (ngSubmit)="onSubmit()" class="wpf-form">
+      <!-- Información General -->
+      <div class="wpf-group-box">
+        <div class="wpf-group-header">Información General</div>
+        <div class="wpf-group-content">
+          <div class="wpf-form-row">
+            <label class="wpf-label">Nombre de la Tarea *</label>
+            <input type="text" [(ngModel)]="job.name" name="name" class="wpf-textbox" required
+              [disabled]="isEditMode" />
+          </div>
+
+          <div class="wpf-form-row">
+            <label class="wpf-label">Código de Operación *</label>
+            <input type="text" [(ngModel)]="job.operationCode" name="operationCode" class="wpf-textbox" required />
+          </div>
+
+          <div class="wpf-form-row">
+            <label class="wpf-label">
+              <input type="checkbox" [(ngModel)]="job.enabled" name="enabled" class="wpf-checkbox" />
+              Habilitada
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Carga de Archivo ZIP -->
+      <div class="wpf-group-box" *ngIf="showFileUpload">
+        <div class="wpf-group-header">Archivo Ejecutable</div>
+        <div class="wpf-group-content">
+          <div class="wpf-form-row">
+            <label class="wpf-label">Subir ZIP con Ejecutable</label>
+            <div class="file-upload-container">
+              <input type="file" (change)="onFileSelected($event)" accept=".zip" #fileInput
+                class="wpf-file-input" />
+              <button type="button" (click)="fileInput.click()" class="wpf-button secondary">
+                Seleccionar Archivo
+              </button>
+              <span class="file-name" *ngIf="selectedFile">{{ selectedFile.name }}</span>
+            </div>
+          </div>
+
+          <div class="wpf-form-row" *ngIf="selectedFile">
+            <button type="button" (click)="uploadFile()" class="wpf-button primary" [disabled]="loading">
+              {{ loading ? 'Cargando...' : 'Cargar Archivo' }}
+            </button>
+          </div>
+
+          <div class="wpf-form-row" *ngIf="uploadProgress > 0 && uploadProgress < 100">
+            <div class="wpf-progress-bar">
+              <div class="wpf-progress-fill" [style.width.%]="uploadProgress"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuración de Ejecución -->
+      <div class="wpf-group-box">
+        <div class="wpf-group-header">Configuración de Ejecución</div>
+        <div class="wpf-group-content">
+          <div class="wpf-form-row">
+            <label class="wpf-label">Comando/Ejecutable</label>
+            <input type="text" [(ngModel)]="job.command" name="command" class="wpf-textbox"
+              placeholder="Ej: C:\Apps\MiApp.exe" />
+          </div>
+
+          <div class="wpf-form-row">
+            <label class="wpf-label">Argumentos</label>
+            <input type="text" [(ngModel)]="job.arguments" name="arguments" class="wpf-textbox"
+              placeholder="Ej: --mode production" />
+          </div>
+
+          <div class="wpf-form-row">
+            <label class="wpf-label">Directorio de Trabajo</label>
+            <input type="text" [(ngModel)]="job.workingDirectory" name="workingDirectory" class="wpf-textbox"
+              placeholder="Ej: C:\Apps" />
+          </div>
+
+          <div class="wpf-form-row">
+            <label class="wpf-label">
+              <input type="checkbox" [(ngModel)]="job.showWindow" name="showWindow" class="wpf-checkbox" />
+              Mostrar Ventana
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Programación -->
+      <div class="wpf-group-box">
+        <div class="wpf-group-header">Programación</div>
+        <div class="wpf-group-content">
+          <div class="wpf-form-row">
+            <label class="wpf-label">Tipo de Programación</label>
+            <select [(ngModel)]="job.scheduleType" name="scheduleType" class="wpf-combobox">
+              <option value="MINUTES">Minutos</option>
+              <option value="DAILY">Diaria</option>
+              <option value="WEEKLY">Semanal</option>
+            </select>
+          </div>
+
+          <div class="wpf-form-row" *ngIf="job.scheduleType === 'MINUTES'">
+            <label class="wpf-label">Intervalo (minutos)</label>
+            <input type="number" [(ngModel)]="job.intervalMinutes" name="intervalMinutes" class="wpf-textbox"
+              min="1" />
+          </div>
+
+          <div class="wpf-form-row" *ngIf="job.scheduleType === 'DAILY'">
+            <label class="wpf-label">Hora de Ejecución</label>
+            <input type="time" [(ngModel)]="job.runAtTime" name="runAtTime" class="wpf-textbox" />
+          </div>
+
+          <div class="wpf-form-row" *ngIf="job.scheduleType === 'WEEKLY'">
+            <label class="wpf-label">Días de la Semana (máscara)</label>
+            <input type="number" [(ngModel)]="job.daysOfWeekMask" name="daysOfWeekMask" class="wpf-textbox"
+              min="0" max="127" />
+            <small class="wpf-help-text">1=Lunes, 2=Martes, 4=Miércoles, 8=Jueves, 16=Viernes, 32=Sábado,
+              64=Domingo</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variables de Entorno -->
+      <div class="wpf-group-box">
+        <div class="wpf-group-header">Variables de Entorno</div>
+        <div class="wpf-group-content">
+          <div class="env-variable" *ngFor="let key of environmentKeys; let i = index">
+            <input type="text" [(ngModel)]="environmentKeys[i]" [name]="'envKey' + i" class="wpf-textbox"
+              placeholder="Clave" style="width: 30%;" />
+            <input type="text" [(ngModel)]="environmentValues[i]" [name]="'envValue' + i" class="wpf-textbox"
+              placeholder="Valor" style="width: 50%; margin-left: 10px;" />
+            <button type="button" (click)="removeEnvironmentVariable(i)" class="wpf-button danger small"
+              style="margin-left: 10px;">
+              Eliminar
+            </button>
+          </div>
+
+          <button type="button" (click)="addEnvironmentVariable()" class="wpf-button secondary">
+            + Agregar Variable
+          </button>
+        </div>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="wpf-button-bar">
+        <button type="submit" class="wpf-button primary" [disabled]="loading">
+          {{ loading ? 'Guardando...' : (isEditMode ? 'Actualizar' : 'Crear') }}
+        </button>
+        <button type="button" (click)="cancel()" class="wpf-button secondary" [disabled]="loading">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-window {
+  margin: 0 !important;
+  min-height: 100vh;
+  border-radius: 0 !important;
+}
+
+.wpf-menu-bar {
+  background: linear-gradient(to bottom, #f8f8f8 0%, #e8e8e8 100%);
+  border-bottom: 1px solid #d0d0d0;
+  display: flex;
+  padding: 0;
+
+  .menu-item {
+    padding: 12px 24px;
+    text-decoration: none;
+    color: #000;
+    font-size: 13px;
+    font-weight: 500;
+    border-right: 1px solid #e0e0e0;
+    transition: background 0.2s;
+    cursor: pointer;
+
+    &:hover {
+      background: #e0e0e0;
+    }
+
+    &.active {
+      background: #d0d0d0;
+      border-bottom: 2px solid #5b9bd5;
+    }
+  }
+}
+
+.main-content {
+  flex: 1;
+  padding: 0;
+}

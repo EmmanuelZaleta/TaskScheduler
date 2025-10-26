@@ -1,0 +1,119 @@
+<div class="wpf-window">
+  <div class="wpf-title-bar">
+    <h2>Panel de Control - Task Scheduler</h2>
+  </div>
+
+  <div class="wpf-content">
+    <div *ngIf="error" class="wpf-alert error">
+      {{ error }}
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ totalJobs }}</div>
+          <div class="stat-label">Total de Tareas</div>
+        </div>
+      </div>
+
+      <div class="stat-card success">
+        <div class="stat-icon">✓</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ enabledJobs }}</div>
+          <div class="stat-label">Tareas Activas</div>
+        </div>
+      </div>
+
+      <div class="stat-card warning">
+        <div class="stat-icon">⏸</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ disabledJobs }}</div>
+          <div class="stat-label">Tareas Inactivas</div>
+        </div>
+      </div>
+
+      <div class="stat-card info">
+        <div class="stat-icon">🕐</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ runsToday }}</div>
+          <div class="stat-label">Ejecuciones Hoy</div>
+        </div>
+      </div>
+
+      <div class="stat-card success">
+        <div class="stat-icon">✔</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ successToday }}</div>
+          <div class="stat-label">Exitosas Hoy</div>
+        </div>
+      </div>
+
+      <div class="stat-card error">
+        <div class="stat-icon">✖</div>
+        <div class="stat-content">
+          <div class="stat-value">{{ failedToday }}</div>
+          <div class="stat-label">Fallidas Hoy</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <h3 class="section-title">Acciones Rápidas</h3>
+      <div class="action-buttons">
+        <a routerLink="/jobs/new" class="wpf-button primary large">
+          + Nueva Tarea
+        </a>
+        <a routerLink="/jobs" class="wpf-button secondary large">
+          Ver Todas las Tareas
+        </a>
+      </div>
+    </div>
+
+    <!-- Recent Runs -->
+    <div class="recent-runs-section">
+      <h3 class="section-title">Ejecuciones Recientes</h3>
+
+      <div *ngIf="loading" class="loading-container">
+        <div class="wpf-spinner"></div>
+      </div>
+
+      <div *ngIf="!loading && recentRuns.length === 0" class="empty-state">
+        <p>No hay ejecuciones recientes</p>
+      </div>
+
+      <div class="wpf-datagrid" *ngIf="!loading && recentRuns.length > 0">
+        <table>
+          <thead>
+            <tr>
+              <th>Estado</th>
+              <th>Tarea</th>
+              <th>Inicio</th>
+              <th>Duración</th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let run of recentRuns">
+              <td>
+                <span class="status-badge" [ngClass]="getStatusClass(run.status)">
+                  {{ run.status }}
+                </span>
+              </td>
+              <td class="job-name">{{ run.jobName }}</td>
+              <td>{{ formatDateTime(run.startedUtc) }}</td>
+              <td>{{ formatDuration(run) }}</td>
+              <td class="message-cell">
+                <span [title]="run.message || ''">
+                  {{ run.message || '-' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
