@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Quartz;
+using YCC.SapAutomation.Abstractions.Automation;
 
 namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
 {
@@ -18,56 +20,95 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
     public const string ShowWindowKey = "showWindow";
 
     private readonly ILogger<ExternalProcessJob> _logger;
+    private readonly IJobExecutionNotificationService _notificationService;
 
-    public ExternalProcessJob(ILogger<ExternalProcessJob> logger)
+    public ExternalProcessJob(
+      ILogger<ExternalProcessJob> logger,
+      IJobExecutionNotificationService notificationService)
     {
       _logger = logger;
+      _notificationService = notificationService;
     }
 
     public async Task Execute(IJobExecutionContext context)
     {
-      _logger.LogInformation("=== INICIANDO EJECUCIÓN DE JOB: {JobName} ===", context.JobDetail.Key.Name);
+      var jobName = context.JobDetail.Key.Name;
+      var stopwatch = Stopwatch.StartNew();
 
-      var data = context.MergedJobDataMap;
-      var command = data.GetString(CommandKey);
-      var arguments = data.GetString(ArgumentsKey) ?? string.Empty;
-      var workingDirectory = data.GetString(WorkingDirectoryKey);
-      var environmentJson = data.GetString(EnvironmentKey);
+      _logger.LogInformation("=== INICIANDO EJECUCIÓN DE JOB: {JobName} ===", jobName);
 
-      if (string.IsNullOrWhiteSpace(command))
-        throw new InvalidOperationException("El comando del proceso externo es obligatorio.");
+      // Notificar inicio
+      await _notificationService.NotifyJobStartingAsync(jobName);
 
-      var showWindow = false;
-      var showWindowRaw = data.GetString(ShowWindowKey);
-      if (!string.IsNullOrWhiteSpace(showWindowRaw))
-        bool.TryParse(showWindowRaw, out showWindow);
-
-      Dictionary<string, string>? envDict = null;
-      if (!string.IsNullOrWhiteSpace(environmentJson))
+      try
       {
-        try { envDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(environmentJson); }
-        catch (Exception ex) { _logger.LogWarning(ex, "No se pudieron cargar variables de entorno para el proceso externo."); }
+        var data = context.MergedJobDataMap;
+        var command = data.GetString(CommandKey);
+        var arguments = data.GetString(ArgumentsKey) ?? string.Empty;
+        var workingDirectory = data.GetString(WorkingDirectoryKey);
+        var environmentJson = data.GetString(EnvironmentKey);
+
+        if (string.IsNullOrWhiteSpace(command))
+          throw new InvalidOperationException("El comando del proceso externo es obligatorio.");
+
+        var showWindow = false;
+        var showWindowRaw = data.GetString(ShowWindowKey);
+        if (!string.IsNullOrWhiteSpace(showWindowRaw))
+          bool.TryParse(showWindowRaw, out showWindow);
+
+        Dictionary<string, string>? envDict = null;
+        if (!string.IsNullOrWhiteSpace(environmentJson))
+        {
+          try { envDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(environmentJson); }
+          catch (Exception ex) { _logger.LogWarning(ex, "No se pudieron cargar variables de entorno para el proceso externo."); }
+        }
+
+        var request = new ExternalProcessCommand(
+          command,
+          arguments,
+          workingDirectory ?? Directory.GetCurrentDirectory(),
+          showWindow,
+          envDict);
+
+        _logger.LogInformation("Ejecutando proceso: Command='{Command}', Args='{Args}', WorkDir='{WorkDir}', ShowWindow={Show}",
+          command, arguments, workingDirectory ?? Directory.GetCurrentDirectory(), showWindow);
+
+        var exitCode = await ExternalProcessExecutor.RunAsync(request, _logger, context.CancellationToken);
+
+        stopwatch.Stop();
+
+        if (exitCode != 0)
+        {
+          _logger.LogError("El proceso externo finalizó con código de salida {ExitCode}.", exitCode);
+
+          // Notificar fallo
+          await _notificationService.NotifyJobCompletedAsync(
+            jobName,
+            stopwatch.Elapsed,
+            exitCode,
+            $"El proceso finalizó con código de salida {exitCode}");
+
+          throw new InvalidOperationException($"El proceso externo finalizo con codigo {exitCode}.");
+        }
+
+        _logger.LogInformation("=== JOB COMPLETADO EXITOSAMENTE: {JobName} (ExitCode=0) ===", jobName);
+
+        // Notificar éxito
+        await _notificationService.NotifyJobCompletedAsync(
+          jobName,
+          stopwatch.Elapsed,
+          0,
+          "Ejecución completada exitosamente");
       }
-
-      var request = new ExternalProcessCommand(
-        command,
-        arguments,
-        workingDirectory ?? Directory.GetCurrentDirectory(),
-        showWindow,
-        envDict);
-
-      _logger.LogInformation("Ejecutando proceso: Command='{Command}', Args='{Args}', WorkDir='{WorkDir}', ShowWindow={Show}",
-        command, arguments, workingDirectory ?? Directory.GetCurrentDirectory(), showWindow);
-
-      var exitCode = await ExternalProcessExecutor.RunAsync(request, _logger, context.CancellationToken);
-
-      if (exitCode != 0)
+      catch (Exception ex)
       {
-        _logger.LogError("El proceso externo finalizó con código de salida {ExitCode}.", exitCode);
-        throw new InvalidOperationException($"El proceso externo finalizo con codigo {exitCode}.");
-      }
+        stopwatch.Stop();
 
-      _logger.LogInformation("=== JOB COMPLETADO EXITOSAMENTE: {JobName} (ExitCode=0) ===", context.JobDetail.Key.Name);
+        // Notificar fallo por excepción
+        await _notificationService.NotifyJobFailedAsync(jobName, ex.Message);
+
+        throw;
+      }
     }
   }
 }
