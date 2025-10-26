@@ -74,7 +74,7 @@ WHERE j.Enabled = 1";
       paramCmd.CommandText = "SELECT [Key],[Value] FROM dbo.JobParam WHERE JobId=@id";
       paramCmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int){Value=j.JobId});
       var env = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
-      string? cmd = null; string? args = null; string? wd = null; bool show = false;
+      string? cmd = null; string? args = null; string? wd = null; bool show = false; string? resourceType = null;
 
       await using (var rd = await paramCmd.ExecuteReaderAsync(cancellationToken))
       {
@@ -86,6 +86,7 @@ WHERE j.Enabled = 1";
           else if (key.Equals("Arguments", StringComparison.OrdinalIgnoreCase)) args = val;
           else if (key.Equals("WorkingDirectory", StringComparison.OrdinalIgnoreCase)) wd = val;
           else if (key.Equals("ShowWindow", StringComparison.OrdinalIgnoreCase)) bool.TryParse(val, out show);
+          else if (key.Equals("ResourceType", StringComparison.OrdinalIgnoreCase)) resourceType = val;
           else if (key.StartsWith("Env:", StringComparison.OrdinalIgnoreCase) && val is not null)
           {
             env[key.Substring(4)] = val;
@@ -106,7 +107,8 @@ WHERE j.Enabled = 1";
         Arguments = args,
         WorkingDirectory = wd,
         ShowWindow = show,
-        Environment = env
+        Environment = env,
+        ResourceType = resourceType
       });
     }
 

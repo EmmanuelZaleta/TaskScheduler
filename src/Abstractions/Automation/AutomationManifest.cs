@@ -16,6 +16,7 @@ public sealed record class AutomationManifest
   public bool? ShowWindow { get; init; }
   public bool Enabled { get; init; } = true;
   public string? Description { get; init; }
+  public string? ResourceType { get; init; }
 
   [JsonIgnore]
   public string? SourcePath { get; init; }

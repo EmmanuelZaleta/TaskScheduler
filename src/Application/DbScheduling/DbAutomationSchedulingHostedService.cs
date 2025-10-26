@@ -15,6 +15,7 @@ namespace YCC.SapAutomation.Application.DbScheduling;
 public sealed class DbAutomationSchedulingHostedService : BackgroundService
 {
   private readonly IJobDefinitionStore _store;
+  private readonly IJobConfigurationCache _configCache;
   private readonly ISchedulerFactory _schedulerFactory;
   private readonly ILogger<DbAutomationSchedulingHostedService> _logger;
   private readonly IHostEnvironment _env;
@@ -24,14 +25,19 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
   private IScheduler? _scheduler;
   private Dictionary<int, string>? _lastSignatures;
+  private bool _isUsingFallback;
+
+  public bool IsUsingFallback => _isUsingFallback;
 
   public DbAutomationSchedulingHostedService(
     IJobDefinitionStore store,
+    IJobConfigurationCache configCache,
     ISchedulerFactory schedulerFactory,
     ILogger<DbAutomationSchedulingHostedService> logger,
     IHostEnvironment env)
   {
     _store = store;
+    _configCache = configCache;
     _schedulerFactory = schedulerFactory;
     _logger = logger;
     _env = env;
@@ -88,13 +94,11 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
   private async Task EnsureSchedulerAsync(CancellationToken cancellationToken)
   {
-    _logger.LogDebug("Consultando base de datos para cargar jobs habilitados...");
-    var defs = await _store.LoadEnabledAsync(cancellationToken).ConfigureAwait(false);
-    _logger.LogInformation("Se encontraron {Count} job(s) habilitado(s) en la base de datos.", defs.Count);
+    var defs = await LoadJobsWithFallbackAsync(cancellationToken).ConfigureAwait(false);
 
     if (defs.Count == 0)
     {
-      _logger.LogWarning("No hay jobs habilitados en BD. Verifica que existan registros en las tablas Job y JobSchedule con Enabled=1.");
+      _logger.LogWarning("No hay jobs disponibles. Verifica la configuración en BD o cache.");
       _lastSignatures = null;
       return;
     }
@@ -134,7 +138,8 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
       { ExternalProcessJob.CommandKey, command },
       { ExternalProcessJob.ArgumentsKey, d.Arguments ?? string.Empty },
       { ExternalProcessJob.WorkingDirectoryKey, workingDir },
-      { ExternalProcessJob.ShowWindowKey, d.ShowWindow.ToString() }
+      { ExternalProcessJob.ShowWindowKey, d.ShowWindow.ToString() },
+      { ExternalProcessJob.ResourceTypeKey, d.ResourceType ?? string.Empty }
     };
 
     if (d.Environment.Count > 0)
@@ -311,5 +316,45 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
     }
 
     return true;
+  }
+
+  private async Task<IReadOnlyCollection<JobDefinition>> LoadJobsWithFallbackAsync(CancellationToken cancellationToken)
+  {
+    try
+    {
+      _logger.LogDebug("Consultando base de datos para cargar jobs habilitados...");
+      var jobs = await _store.LoadEnabledAsync(cancellationToken).ConfigureAwait(false);
+
+      // Success: save to cache
+      _logger.LogInformation("✓ Se encontraron {Count} job(s) habilitado(s) en la base de datos.", jobs.Count);
+      await _configCache.SaveSnapshotAsync(jobs, cancellationToken).ConfigureAwait(false);
+      _isUsingFallback = false;
+
+      return jobs;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "⚠️ Base de datos no disponible, intentando usar configuración en cache...");
+
+      if (_configCache.HasValidSnapshot())
+      {
+        var cached = await _configCache.LoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var cachedList = cached.ToList();
+
+        if (cachedList.Count > 0)
+        {
+          _logger.LogWarning(
+            "🟡 MODO OFFLINE: Usando configuración en cache ({Count} jobs, Última actualización: {Timestamp})",
+            cachedList.Count,
+            _configCache.GetSnapshotTimestamp());
+          _isUsingFallback = true;
+          return cachedList;
+        }
+      }
+
+      _logger.LogError("❌ No hay configuración disponible en cache. El scheduler quedará vacío.");
+      _isUsingFallback = true;
+      return Array.Empty<JobDefinition>();
+    }
   }
 }
