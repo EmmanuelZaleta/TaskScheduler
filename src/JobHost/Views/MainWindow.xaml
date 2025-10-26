@@ -15,7 +15,6 @@
     <Grid>
         <!-- Tray Icon -->
         <tb:TaskbarIcon x:Name="TaskbarIcon"
-                        IconSource="/Resources/app.ico"
                         ToolTipText="YCC Job Host - Task Scheduler"
                         TrayMouseDoubleClick="TaskbarIcon_ShowWindow">
             <tb:TaskbarIcon.ContextMenu>
