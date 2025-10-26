@@ -129,7 +129,7 @@ public class JobsController : ControllerBase
     public async Task<ActionResult<IEnumerable<JobRunDto>>> GetJobRuns(
         int id,
         [FromQuery] int limit = 50,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -146,7 +146,7 @@ public class JobsController : ControllerBase
     [HttpGet("runs")]
     public async Task<ActionResult<IEnumerable<JobRunDto>>> GetAllJobRuns(
         [FromQuery] int limit = 50,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {

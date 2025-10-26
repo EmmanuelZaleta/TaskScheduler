@@ -244,9 +244,13 @@ internal static class Program
     }
 
     private static dynamic GetSapGuiApplication(object rotEntry)
-      => rotEntry
-        .GetType()
-        .InvokeMember("GetScriptingEngine", BindingFlags.InvokeMethod, binder: null, target: rotEntry, args: null);
+    {
+        var result = rotEntry
+            .GetType()
+            .InvokeMember("GetScriptingEngine", BindingFlags.InvokeMethod, binder: null, target: rotEntry, args: null);
+
+        return result ?? throw new InvalidOperationException("Failed to get SAP GUI scripting engine");
+    }
 
     private static dynamic EnsureConnection(dynamic application, SapLoginOptions options)
     {
