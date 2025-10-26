@@ -2,20 +2,29 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 using YCC.SapAutomation.Abstractions.DbScheduling;
 using YCC.SapAutomation.Infrastructure.Sql;
+using Microsoft.Extensions.Logging;
 
 namespace YCC.SapAutomation.Infrastructure.Persistence;
 
 public sealed class SqlJobDefinitionStore : IJobDefinitionStore
 {
   private readonly IDbConnectionFactory _factory;
-  public SqlJobDefinitionStore(IDbConnectionFactory factory) => _factory = factory;
+  private readonly ILogger<SqlJobDefinitionStore> _logger;
+
+  public SqlJobDefinitionStore(IDbConnectionFactory factory, ILogger<SqlJobDefinitionStore> logger)
+  {
+    _factory = factory;
+    _logger = logger;
+  }
 
   public async Task<IReadOnlyCollection<JobDefinition>> LoadEnabledAsync(CancellationToken cancellationToken)
   {
     var list = new List<JobDefinition>();
 
+    _logger.LogDebug("Conectando a la base de datos para cargar jobs...");
     await using var cn = _factory.Create();
     await cn.OpenAsync(cancellationToken);
+    _logger.LogDebug("Conexión a base de datos establecida.");
 
     var jobsCmd = cn.CreateCommand();
     jobsCmd.CommandText = @"
@@ -25,6 +34,8 @@ FROM dbo.Job j
 JOIN dbo.JobSchedule js ON js.JobId = j.JobId
 WHERE j.Enabled = 1";
     jobsCmd.CommandType = CommandType.Text;
+
+    _logger.LogDebug("Ejecutando query: {Query}", jobsCmd.CommandText);
 
     var jobs = new List<(int JobId,string Name,string Op,string SType,int? Interval, TimeSpan? RunAt, byte? Mask)>();
     await using (var rd = await jobsCmd.ExecuteReaderAsync(cancellationToken))
@@ -42,6 +53,8 @@ WHERE j.Enabled = 1";
         jobs.Add((jobId,name,op,sType,interval,runAt,mask));
       }
     }
+
+    _logger.LogDebug("Se recuperaron {Count} job(s) de las tablas Job/JobSchedule.", jobs.Count);
 
     foreach (var j in jobs)
     {
