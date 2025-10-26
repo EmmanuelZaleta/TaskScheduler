@@ -39,15 +39,21 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
   protected override async Task ExecuteAsync(CancellationToken stoppingToken)
   {
+    _logger.LogInformation("=== DbAutomationSchedulingHostedService INICIADO ===");
+    _logger.LogInformation("El servicio verificará la base de datos cada {Seconds} segundos para cargar jobs programados.", _refreshInterval.TotalSeconds);
+
     while (!stoppingToken.IsCancellationRequested)
     {
       try
       {
+        _logger.LogDebug("Verificando jobs en base de datos...");
         await EnsureSchedulerAsync(stoppingToken).ConfigureAwait(false);
+        _logger.LogDebug("Esperando {Seconds}s hasta la próxima verificación...", _refreshInterval.TotalSeconds);
         await Task.Delay(_refreshInterval, stoppingToken).ConfigureAwait(false);
       }
       catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
       {
+        _logger.LogInformation("Servicio de programación detenido por solicitud de cancelación.");
         break;
       }
       catch (Exception ex)
@@ -82,11 +88,13 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
   private async Task EnsureSchedulerAsync(CancellationToken cancellationToken)
   {
+    _logger.LogDebug("Consultando base de datos para cargar jobs habilitados...");
     var defs = await _store.LoadEnabledAsync(cancellationToken).ConfigureAwait(false);
+    _logger.LogInformation("Se encontraron {Count} job(s) habilitado(s) en la base de datos.", defs.Count);
 
     if (defs.Count == 0)
     {
-      _logger.LogWarning("No hay jobs habilitados en BD.");
+      _logger.LogWarning("No hay jobs habilitados en BD. Verifica que existan registros en las tablas Job y JobSchedule con Enabled=1.");
       _lastSignatures = null;
       return;
     }
@@ -99,12 +107,21 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
     if (shouldReload)
     {
+      _logger.LogInformation("Detectados cambios en la configuración de jobs. Reprogramando...");
       await RegisterDefinitionsAsync(_scheduler, defs, cancellationToken).ConfigureAwait(false);
       _lastSignatures = signatures;
     }
+    else
+    {
+      _logger.LogDebug("No hay cambios en la configuración de jobs.");
+    }
 
     if (_scheduler.InStandbyMode || !_scheduler.IsStarted)
+    {
+      _logger.LogInformation("Iniciando scheduler de Quartz...");
       await _scheduler.Start(cancellationToken).ConfigureAwait(false);
+      _logger.LogInformation("Scheduler iniciado. Los jobs se ejecutarán según su programación.");
+    }
   }
 
   private IJobDetail BuildJobDetail(JobDefinition d)
@@ -141,9 +158,11 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
 
     if (obsolete.Count > 0)
     {
+      _logger.LogInformation("Eliminando {Count} job(s) obsoleto(s)...", obsolete.Count);
       await scheduler.DeleteJobs(obsolete).ConfigureAwait(false);
     }
 
+    _logger.LogInformation("Programando {Count} job(s)...", defs.Count);
     foreach (var d in defs)
     {
       try
@@ -151,11 +170,14 @@ public sealed class DbAutomationSchedulingHostedService : BackgroundService
         var detail = BuildJobDetail(d);
         var trigger = BuildTrigger(d, detail);
         await scheduler.ScheduleJob(detail, new HashSet<ITrigger> { trigger }, true, cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Registrado {Name} ({Schedule})", d.Name, d.ScheduleType);
+
+        var cmd = string.IsNullOrWhiteSpace(d.Command) ? ResolveDefaultCommand(d.OperationCode) : d.Command;
+        _logger.LogInformation("✓ Job programado: '{Name}' (ID={JobId}) - Ejecutará: '{Command} {Args}' - Programación: {Schedule}",
+          d.Name, d.JobId, cmd, d.Arguments ?? "", d.ScheduleType);
       }
       catch (Exception ex)
       {
-        _logger.LogError(ex, "No se pudo registrar el job {Name}", d.Name);
+        _logger.LogError(ex, "✗ Error al registrar el job '{Name}' (ID={JobId})", d.Name, d.JobId);
       }
     }
   }

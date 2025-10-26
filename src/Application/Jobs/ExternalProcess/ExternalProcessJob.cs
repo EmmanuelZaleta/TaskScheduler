@@ -26,6 +26,8 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
 
     public async Task Execute(IJobExecutionContext context)
     {
+      _logger.LogInformation("=== INICIANDO EJECUCIÓN DE JOB: {JobName} ===", context.JobDetail.Key.Name);
+
       var data = context.MergedJobDataMap;
       var command = data.GetString(CommandKey);
       var arguments = data.GetString(ArgumentsKey) ?? string.Empty;
@@ -54,12 +56,18 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess
         showWindow,
         envDict);
 
+      _logger.LogInformation("Ejecutando proceso: Command='{Command}', Args='{Args}', WorkDir='{WorkDir}', ShowWindow={Show}",
+        command, arguments, workingDirectory ?? Directory.GetCurrentDirectory(), showWindow);
+
       var exitCode = await ExternalProcessExecutor.RunAsync(request, _logger, context.CancellationToken);
 
       if (exitCode != 0)
       {
+        _logger.LogError("El proceso externo finalizó con código de salida {ExitCode}.", exitCode);
         throw new InvalidOperationException($"El proceso externo finalizo con codigo {exitCode}.");
       }
+
+      _logger.LogInformation("=== JOB COMPLETADO EXITOSAMENTE: {JobName} (ExitCode=0) ===", context.JobDetail.Key.Name);
     }
   }
 }
