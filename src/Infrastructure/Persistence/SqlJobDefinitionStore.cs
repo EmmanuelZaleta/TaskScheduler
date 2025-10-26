@@ -23,8 +23,20 @@ public sealed class SqlJobDefinitionStore : IJobDefinitionStore
 
     _logger.LogDebug("Conectando a la base de datos para cargar jobs...");
     await using var cn = _factory.Create();
-    await cn.OpenAsync(cancellationToken);
-    _logger.LogDebug("Conexión a base de datos establecida.");
+
+    try
+    {
+      await cn.OpenAsync(cancellationToken);
+      _logger.LogDebug("Conexión a base de datos establecida.");
+    }
+    catch (Exception ex)
+    {
+      // Log the connection string with password masked for debugging
+      var connectionString = cn.ConnectionString;
+      var maskedConnectionString = MaskPassword(connectionString);
+      _logger.LogError(ex, "Error al conectar a la base de datos. Connection String (con password enmascarado): {ConnectionString}", maskedConnectionString);
+      throw;
+    }
 
     var jobsCmd = cn.CreateCommand();
     jobsCmd.CommandText = @"
@@ -99,6 +111,41 @@ WHERE j.Enabled = 1";
     }
 
     return list;
+  }
+
+  private static string MaskPassword(string connectionString)
+  {
+    if (string.IsNullOrWhiteSpace(connectionString))
+      return connectionString;
+
+    // Common password patterns in connection strings
+    var patterns = new[]
+    {
+      "Password=",
+      "PWD=",
+      "pwd="
+    };
+
+    var result = connectionString;
+    foreach (var pattern in patterns)
+    {
+      var startIndex = result.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+      if (startIndex >= 0)
+      {
+        var passwordStart = startIndex + pattern.Length;
+        var endIndex = result.IndexOf(';', passwordStart);
+        var passwordLength = endIndex >= 0 ? endIndex - passwordStart : result.Length - passwordStart;
+
+        if (passwordLength > 0)
+        {
+          var maskedPassword = new string('*', Math.Min(passwordLength, 8));
+          result = result.Substring(0, passwordStart) + maskedPassword +
+                   (endIndex >= 0 ? result.Substring(endIndex) : "");
+        }
+      }
+    }
+
+    return result;
   }
 }
 
