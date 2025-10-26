@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using YCC.SapAutomation.Abstractions.Automation;
@@ -244,15 +245,17 @@ public sealed class JobExecutionViewModel
     State = notification.State.ToString();
     Timestamp = notification.Timestamp;
     Message = notification.Message ?? string.Empty;
-    Duration = notification.Duration?.TotalSeconds.ToString("F2") + "s" ?? "N/A";
+    Duration = notification.Duration.HasValue
+      ? $"{notification.Duration.Value.TotalSeconds:F2}s"
+      : "N/A";
     ExitCode = notification.ExitCode?.ToString() ?? "N/A";
 
     StateColor = notification.State switch
     {
-      JobExecutionState.Completed => "#27AE60",
-      JobExecutionState.Failed => "#E74C3C",
-      JobExecutionState.Starting => "#3498DB",
-      _ => "#95A5A6"
+      JobExecutionState.Completed => new SolidColorBrush(Color.FromRgb(39, 174, 96)),
+      JobExecutionState.Failed => new SolidColorBrush(Color.FromRgb(231, 76, 60)),
+      JobExecutionState.Starting => new SolidColorBrush(Color.FromRgb(52, 152, 219)),
+      _ => new SolidColorBrush(Color.FromRgb(149, 165, 166))
     };
   }
 
@@ -262,7 +265,7 @@ public sealed class JobExecutionViewModel
   public string Message { get; }
   public string Duration { get; }
   public string ExitCode { get; }
-  public string StateColor { get; }
+  public Brush StateColor { get; }
 }
 
 public sealed class RelayCommand : ICommand
