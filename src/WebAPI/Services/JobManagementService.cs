@@ -28,7 +28,6 @@ public sealed class JobManagementService : IJobManagementService
         var sql = @"
             SELECT
                 j.JobId, j.Name, j.OperationCode, j.Enabled,
-                j.Command, j.Arguments, j.WorkingDirectory, j.ShowWindow, j.Environment,
                 s.ScheduleType, s.IntervalMinutes, s.RunAtTime, s.DaysOfWeekMask
             FROM dbo.Job j
             LEFT JOIN dbo.JobSchedule s ON j.JobId = s.JobId
@@ -56,7 +55,6 @@ public sealed class JobManagementService : IJobManagementService
         var sql = @"
             SELECT
                 j.JobId, j.Name, j.OperationCode, j.Enabled,
-                j.Command, j.Arguments, j.WorkingDirectory, j.ShowWindow, j.Environment,
                 s.ScheduleType, s.IntervalMinutes, s.RunAtTime, s.DaysOfWeekMask
             FROM dbo.Job j
             LEFT JOIN dbo.JobSchedule s ON j.JobId = s.JobId
@@ -85,27 +83,22 @@ public sealed class JobManagementService : IJobManagementService
 
         // Insert Job
         var insertJobSql = @"
-            INSERT INTO Job (Name, OperationCode, Enabled, Command, Arguments, WorkingDirectory, ShowWindow, Environment)
+            INSERT INTO Job (Name, OperationCode, Enabled)
             OUTPUT INSERTED.JobId
-            VALUES (@Name, @OperationCode, @Enabled, @Command, @Arguments, @WorkingDirectory, @ShowWindow, @Environment)";
+            VALUES (@Name, @OperationCode, @Enabled)";
 
         await using (var command = new SqlCommand(insertJobSql, connection))
         {
             command.Parameters.AddWithValue("@Name", createDto.Name);
             command.Parameters.AddWithValue("@OperationCode", createDto.OperationCode);
             command.Parameters.AddWithValue("@Enabled", createDto.Enabled);
-            command.Parameters.AddWithValue("@Command", (object?)createDto.Command ?? DBNull.Value);
-            command.Parameters.AddWithValue("@Arguments", (object?)createDto.Arguments ?? DBNull.Value);
-            command.Parameters.AddWithValue("@WorkingDirectory", (object?)createDto.WorkingDirectory ?? DBNull.Value);
-            command.Parameters.AddWithValue("@ShowWindow", createDto.ShowWindow);
-
-            var envJson = createDto.Environment != null
-                ? JsonConvert.SerializeObject(createDto.Environment)
-                : null;
-            command.Parameters.AddWithValue("@Environment", (object?)envJson ?? DBNull.Value);
 
             jobId = (int)await command.ExecuteScalarAsync(cancellationToken);
         }
+
+        // Insert JobParams
+        await SaveJobParamsAsync(connection, jobId, createDto.Command, createDto.Arguments,
+            createDto.WorkingDirectory, createDto.ShowWindow, createDto.Environment, cancellationToken);
 
         // Insert JobSchedule
         var insertScheduleSql = @"
@@ -153,42 +146,31 @@ public sealed class JobManagementService : IJobManagementService
             command.Parameters.AddWithValue("@Enabled", updateDto.Enabled.Value);
         }
 
-        if (updateDto.Command != null)
-        {
-            updates.Add("Command = @Command");
-            command.Parameters.AddWithValue("@Command", updateDto.Command);
-        }
-
-        if (updateDto.Arguments != null)
-        {
-            updates.Add("Arguments = @Arguments");
-            command.Parameters.AddWithValue("@Arguments", updateDto.Arguments);
-        }
-
-        if (updateDto.WorkingDirectory != null)
-        {
-            updates.Add("WorkingDirectory = @WorkingDirectory");
-            command.Parameters.AddWithValue("@WorkingDirectory", updateDto.WorkingDirectory);
-        }
-
-        if (updateDto.ShowWindow.HasValue)
-        {
-            updates.Add("ShowWindow = @ShowWindow");
-            command.Parameters.AddWithValue("@ShowWindow", updateDto.ShowWindow.Value);
-        }
-
-        if (updateDto.Environment != null)
-        {
-            updates.Add("Environment = @Environment");
-            var envJson = JsonConvert.SerializeObject(updateDto.Environment);
-            command.Parameters.AddWithValue("@Environment", envJson);
-        }
-
         if (updates.Count > 0)
         {
             command.CommandText = $"UPDATE Job SET {string.Join(", ", updates)} WHERE JobId = @JobId";
             command.Parameters.AddWithValue("@JobId", jobId);
             await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Update JobParams if any are provided
+        if (updateDto.Command != null || updateDto.Arguments != null || updateDto.WorkingDirectory != null ||
+            updateDto.ShowWindow.HasValue || updateDto.Environment != null)
+        {
+            // First, get current values to merge with updates
+            var currentJob = await GetJobByIdAsync(jobId, cancellationToken);
+            if (currentJob == null)
+            {
+                return null;
+            }
+
+            var command1 = updateDto.Command ?? currentJob.Command;
+            var arguments = updateDto.Arguments ?? currentJob.Arguments;
+            var workingDirectory = updateDto.WorkingDirectory ?? currentJob.WorkingDirectory;
+            var showWindow = updateDto.ShowWindow ?? currentJob.ShowWindow;
+            var environment = updateDto.Environment ?? currentJob.Environment;
+
+            await SaveJobParamsAsync(connection, jobId, command1, arguments, workingDirectory, showWindow, environment, cancellationToken);
         }
 
         // Update schedule if needed
@@ -235,7 +217,15 @@ public sealed class JobManagementService : IJobManagementService
     {
         await using var connection = await _connectionFactory.CreateAsync(cancellationToken);
 
-        // Delete schedule first (FK constraint)
+        // Delete params first
+        var deleteParamsSql = "DELETE FROM JobParam WHERE JobId = @JobId";
+        await using (var command = new SqlCommand(deleteParamsSql, connection))
+        {
+            command.Parameters.AddWithValue("@JobId", jobId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Delete schedule (FK constraint)
         var deleteScheduleSql = "DELETE FROM JobSchedule WHERE JobId = @JobId";
         await using (var command = new SqlCommand(deleteScheduleSql, connection))
         {
@@ -423,27 +413,88 @@ public sealed class JobManagementService : IJobManagementService
         }
     }
 
+    private static async Task SaveJobParamsAsync(
+        SqlConnection connection,
+        int jobId,
+        string? command,
+        string? arguments,
+        string? workingDirectory,
+        bool showWindow,
+        Dictionary<string, string>? environment,
+        CancellationToken cancellationToken)
+    {
+        // Delete existing params
+        var deleteSql = "DELETE FROM dbo.JobParam WHERE JobId = @JobId";
+        await using (var deleteCmd = new SqlCommand(deleteSql, connection))
+        {
+            deleteCmd.Parameters.AddWithValue("@JobId", jobId);
+            await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Insert new params
+        var insertSql = "INSERT INTO dbo.JobParam (JobId, [Key], [Value]) VALUES (@JobId, @Key, @Value)";
+
+        if (!string.IsNullOrWhiteSpace(command))
+        {
+            await using var cmd = new SqlCommand(insertSql, connection);
+            cmd.Parameters.AddWithValue("@JobId", jobId);
+            cmd.Parameters.AddWithValue("@Key", "Command");
+            cmd.Parameters.AddWithValue("@Value", command);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(arguments))
+        {
+            await using var cmd = new SqlCommand(insertSql, connection);
+            cmd.Parameters.AddWithValue("@JobId", jobId);
+            cmd.Parameters.AddWithValue("@Key", "Arguments");
+            cmd.Parameters.AddWithValue("@Value", arguments);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            await using var cmd = new SqlCommand(insertSql, connection);
+            cmd.Parameters.AddWithValue("@JobId", jobId);
+            cmd.Parameters.AddWithValue("@Key", "WorkingDirectory");
+            cmd.Parameters.AddWithValue("@Value", workingDirectory);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        {
+            await using var cmd = new SqlCommand(insertSql, connection);
+            cmd.Parameters.AddWithValue("@JobId", jobId);
+            cmd.Parameters.AddWithValue("@Key", "ShowWindow");
+            cmd.Parameters.AddWithValue("@Value", showWindow.ToString().ToLower());
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (environment != null)
+        {
+            foreach (var kvp in environment)
+            {
+                await using var cmd = new SqlCommand(insertSql, connection);
+                cmd.Parameters.AddWithValue("@JobId", jobId);
+                cmd.Parameters.AddWithValue("@Key", $"Env:{kvp.Key}");
+                cmd.Parameters.AddWithValue("@Value", kvp.Value);
+                await cmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+    }
+
     private static JobDefinitionDto MapToDto(SqlDataReader reader)
     {
-        var envJson = reader.IsDBNull(reader.GetOrdinal("Environment"))
-            ? null
-            : reader.GetString(reader.GetOrdinal("Environment"));
-
-        var environment = !string.IsNullOrEmpty(envJson)
-            ? JsonConvert.DeserializeObject<Dictionary<string, string>>(envJson)
-            : null;
-
         return new JobDefinitionDto
         {
             JobId = reader.GetInt32(reader.GetOrdinal("JobId")),
             Name = reader.GetString(reader.GetOrdinal("Name")),
             OperationCode = reader.GetString(reader.GetOrdinal("OperationCode")),
             Enabled = reader.GetBoolean(reader.GetOrdinal("Enabled")),
-            Command = reader.IsDBNull(reader.GetOrdinal("Command")) ? null : reader.GetString(reader.GetOrdinal("Command")),
-            Arguments = reader.IsDBNull(reader.GetOrdinal("Arguments")) ? null : reader.GetString(reader.GetOrdinal("Arguments")),
-            WorkingDirectory = reader.IsDBNull(reader.GetOrdinal("WorkingDirectory")) ? null : reader.GetString(reader.GetOrdinal("WorkingDirectory")),
-            ShowWindow = reader.GetBoolean(reader.GetOrdinal("ShowWindow")),
-            Environment = environment,
+            Command = null,  // Will be loaded from JobParam
+            Arguments = null,  // Will be loaded from JobParam
+            WorkingDirectory = null,  // Will be loaded from JobParam
+            ShowWindow = false,  // Will be loaded from JobParam
+            Environment = null,  // Will be loaded from JobParam
             ScheduleType = reader.IsDBNull(reader.GetOrdinal("ScheduleType")) ? "MINUTES" : reader.GetString(reader.GetOrdinal("ScheduleType")),
             IntervalMinutes = reader.IsDBNull(reader.GetOrdinal("IntervalMinutes")) ? null : reader.GetInt32(reader.GetOrdinal("IntervalMinutes")),
             RunAtTime = reader.IsDBNull(reader.GetOrdinal("RunAtTime")) ? null : reader.GetTimeSpan(reader.GetOrdinal("RunAtTime")).ToString(),
