@@ -1,0 +1,11 @@
+{
+  "name": "SampleSapJob",
+  "description": "Ejemplo de job que usa conexión SAP con throttling",
+  "cron": "0 0/15 * * * ?",
+  "kind": "ExternalProcess",
+  "command": "bin/Debug/net8.0/YCC.SampleExternalApp.exe",
+  "arguments": "",
+  "workingDirectory": "../ExternalApps/SampleExternalApp",
+  "resourceType": "SapConnection",
+  "enabled": false
+}

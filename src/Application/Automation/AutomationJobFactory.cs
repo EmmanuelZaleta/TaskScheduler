@@ -41,6 +41,7 @@ namespace YCC.SapAutomation.Application.Automation
           .UsingJobData(ExternalProcessJob.EnvironmentKey, manifest.Environment is null
             ? string.Empty
             : System.Text.Json.JsonSerializer.Serialize(manifest.Environment))
+          .UsingJobData(ExternalProcessJob.ResourceTypeKey, manifest.ResourceType ?? string.Empty)
           .Build(),
         _ => throw new NotSupportedException($"Tipo de automatizacion no soportado: {manifest.Kind}")
       };

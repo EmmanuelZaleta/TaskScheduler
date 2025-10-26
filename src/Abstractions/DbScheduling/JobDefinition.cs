@@ -11,6 +11,7 @@ public sealed class JobDefinition
   public string? WorkingDirectory { get; init; }
   public bool ShowWindow { get; init; }
   public IReadOnlyDictionary<string, string> Environment { get; init; } = new Dictionary<string, string>();
+  public string? ResourceType { get; init; }
 
   public string ScheduleType { get; init; } = "MINUTES";
   public int? IntervalMinutes { get; init; }
