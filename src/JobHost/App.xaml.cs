@@ -28,7 +28,7 @@ namespace YCC.SapAutomation.Host
         .AddEnvironmentVariables();
 
       Log.Logger = new LoggerConfiguration()
-        .ReadFrom.Configuration(builder.Configuration, sectionName: "Serilog")
+        .ReadFrom.Configuration(builder.Configuration)
         .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
         .WriteTo.Debug()
         .WriteTo.File("logs/jobhost-.log", rollingInterval: RollingInterval.Day)

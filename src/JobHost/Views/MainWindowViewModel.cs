@@ -184,7 +184,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
       // Cargar historial reciente
       var recentNotifications = await _notificationService.GetRecentExecutionsAsync(20);
 
-      Application.Current.Dispatcher.Invoke(() =>
+      System.Windows.Application.Current.Dispatcher.Invoke(() =>
       {
         RecentExecutions.Clear();
         foreach (var notification in recentNotifications.OrderByDescending(n => n.Timestamp))
@@ -210,7 +210,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
   private void OnJobExecutionChanged(object? sender, JobExecutionNotification notification)
   {
-    Application.Current.Dispatcher.Invoke(() =>
+    System.Windows.Application.Current.Dispatcher.Invoke(() =>
     {
       RecentExecutions.Insert(0, new JobExecutionViewModel(notification));
 

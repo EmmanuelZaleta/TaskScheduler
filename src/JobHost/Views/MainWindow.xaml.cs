@@ -62,7 +62,7 @@ public partial class MainWindow : Window
 
   private void TaskbarIcon_Exit(object sender, RoutedEventArgs e)
   {
-    Application.Current.Shutdown();
+    System.Windows.Application.Current.Shutdown();
   }
 
   private void Autostart_Checked(object sender, RoutedEventArgs e)
