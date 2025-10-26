@@ -3,23 +3,20 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
-[SupportedOSPlatform("windows")]
 internal static class Program
 {
     public static int Main(string[] args)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            Console.Error.WriteLine("[00:00:00] Este ejecutable solo funciona en Windows.");
-            return 1;
-        }
-
         var parsed = ParseArgs(args);
 
-        if (!string.IsNullOrWhiteSpace(parsed.Title))
-            Console.Title = parsed.Title;
-        else
-            Console.Title = $"SampleExternalApp PID={Environment.ProcessId} {DateTime.Now:HH:mm:ss}";
+        // Console.Title solo funciona en Windows
+        if (OperatingSystem.IsWindows())
+        {
+            if (!string.IsNullOrWhiteSpace(parsed.Title))
+                Console.Title = parsed.Title;
+            else
+                Console.Title = $"SampleExternalApp PID={Environment.ProcessId} {DateTime.Now:HH:mm:ss}";
+        }
 
         var greeting = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_GREETING") ?? "Hola";
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -86,7 +83,8 @@ internal static class Program
     private static ParsedArgs ParseArgs(string[] args)
     {
         int sleep = 0; string write = string.Empty; int exit = 0; int hold = 0; string? title = null;
-        bool sapEnabled = !IsDisabled(Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SKIP_SAP"));
+        // SAP GUI solo funciona en Windows - deshabilitado automáticamente en otros sistemas
+        bool sapEnabled = OperatingSystem.IsWindows() && !IsDisabled(Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SKIP_SAP"));
         string sapSystem = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_SYSTEM") ?? ".YNCA - EQ2 - ERP QA2";
         string sapClient = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_CLIENT") ?? string.Empty;
         string sapUser = Environment.GetEnvironmentVariable("SAMPLE_EXTERNAL_SAP_USER") ?? "90022817";
@@ -141,6 +139,7 @@ internal static class Program
         return new ParsedArgs(sleep, write, exit, hold, title, sapOptions);
     }
 
+    [SupportedOSPlatform("windows")]
     private static void EnsureSapLogin(SapLoginOptions options)
     {
         Console.WriteLine($"{Timestamp()} Preparando login en SAP GUI para \"{options.SystemDescription}\" como usuario {options.User}...");
@@ -180,6 +179,7 @@ internal static class Program
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static object AcquireSapRotEntry(SapLoginOptions options)
     {
         var rotType = Type.GetTypeFromProgID("SapROTWr.SapROTWrapper");
@@ -207,6 +207,7 @@ internal static class Program
         throw new InvalidOperationException("SAP GUI no se registro en el tiempo limite configurado.");
     }
 
+    [SupportedOSPlatform("windows")]
     private static object? TryGetSapRotEntry(Type rotType)
     {
         dynamic? rot = null;
@@ -224,6 +225,7 @@ internal static class Program
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static void LaunchSapGui(SapLoginOptions options)
     {
         var exe = !string.IsNullOrWhiteSpace(options.SapGuiPath)
@@ -243,6 +245,7 @@ internal static class Program
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static dynamic GetSapGuiApplication(object rotEntry)
     {
         var result = rotEntry
@@ -257,6 +260,7 @@ internal static class Program
         return result;
     }
 
+    [SupportedOSPlatform("windows")]
     private static dynamic EnsureConnection(dynamic application, SapLoginOptions options)
     {
         var existing = TryGetExistingConnection(application, options.SystemDescription);
@@ -270,6 +274,7 @@ internal static class Program
         return application.OpenConnection(options.SystemDescription, true);
     }
 
+    [SupportedOSPlatform("windows")]
     private static dynamic? TryGetExistingConnection(dynamic application, string systemDescription)
     {
         try
@@ -296,6 +301,7 @@ internal static class Program
       => !string.IsNullOrWhiteSpace(actual) &&
          actual.Trim().Equals(expected.Trim(), StringComparison.OrdinalIgnoreCase);
 
+    [SupportedOSPlatform("windows")]
     private static dynamic EnsureSession(dynamic connection, SapLoginOptions options)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(options.StartupTimeoutSeconds);
@@ -317,6 +323,7 @@ internal static class Program
         throw new InvalidOperationException("No se encontro una sesion SAP activa en el tiempo limite.");
     }
 
+    [SupportedOSPlatform("windows")]
     private static void PopulateLoginFields(dynamic session, SapLoginOptions options)
     {
         if (!string.IsNullOrWhiteSpace(options.Client))
@@ -329,6 +336,7 @@ internal static class Program
             TrySetText(session, "wnd[0]/usr/txtRSYST-LANGU", options.Language);
     }
 
+    [SupportedOSPlatform("windows")]
     private static void WaitForUser(dynamic session, SapLoginOptions options)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(options.StartupTimeoutSeconds);
@@ -346,6 +354,7 @@ internal static class Program
         Console.Error.WriteLine($"{Timestamp()} Advertencia: no se pudo confirmar el usuario autenticado en SAP dentro del tiempo limite.");
     }
 
+    [SupportedOSPlatform("windows")]
     private static void HandleOptionalPopup(dynamic session)
     {
         try
@@ -364,6 +373,7 @@ internal static class Program
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static void TrySetText(dynamic session, string id, string value, bool mask = false)
     {
         try

@@ -195,12 +195,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
       // Calcular estadísticas del día
       var today = DateTime.Today;
-      var todayExecutions = recentNotifications.Where(n => n.Timestamp.Date == today).ToList();
+      var todayExecutions = recentNotifications.Where(n => n.Timestamp.ToLocalTime().Date == today).ToList();
       JobsExecutedToday = todayExecutions.Count(n => n.State == JobExecutionState.Completed);
       FailedJobsToday = todayExecutions.Count(n => n.State == JobExecutionState.Failed);
 
       if (recentNotifications.Any())
-        LastExecution = recentNotifications.Max(n => n.Timestamp);
+        LastExecution = recentNotifications.Max(n => n.Timestamp).ToLocalTime();
     }
     catch (Exception ex)
     {
@@ -219,7 +219,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         RecentExecutions.RemoveAt(RecentExecutions.Count - 1);
 
       // Actualizar estadísticas
-      if (notification.Timestamp.Date == DateTime.Today)
+      if (notification.Timestamp.ToLocalTime().Date == DateTime.Today)
       {
         if (notification.State == JobExecutionState.Completed)
           JobsExecutedToday++;
@@ -227,7 +227,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
           FailedJobsToday++;
       }
 
-      LastExecution = notification.Timestamp;
+      LastExecution = notification.Timestamp.ToLocalTime();
     });
   }
 
@@ -243,7 +243,7 @@ public sealed class JobExecutionViewModel
   {
     JobName = notification.JobName;
     State = notification.State.ToString();
-    Timestamp = notification.Timestamp;
+    Timestamp = notification.Timestamp.ToLocalTime();
     Message = notification.Message ?? string.Empty;
     Duration = notification.Duration.HasValue
       ? $"{notification.Duration.Value.TotalSeconds:F2}s"
