@@ -32,11 +32,15 @@ namespace YCC.SapAutomation.Infrastructure.DependencyInjection
       services.AddSingleton<IClock, UtcClock>();
 
       // Resource throttling
-      services.Configure<ResourceThrottlingOptions>(configuration.GetSection(ResourceThrottlingOptions.SectionName));
+      services
+        .AddOptions<ResourceThrottlingOptions>()
+        .Bind(configuration.GetSection(ResourceThrottlingOptions.SectionName));
       services.AddSingleton<IResourceThrottlingManager, ResourceThrottlingManager>();
 
       // Job configuration cache
-      services.Configure<JobConfigurationCacheOptions>(configuration.GetSection(JobConfigurationCacheOptions.SectionName));
+      services
+        .AddOptions<JobConfigurationCacheOptions>()
+        .Bind(configuration.GetSection(JobConfigurationCacheOptions.SectionName));
       services.AddSingleton<IJobConfigurationCache, FileSystemJobConfigurationCache>();
 
       return services;
