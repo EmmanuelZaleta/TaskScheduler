@@ -1,0 +1,81 @@
+<div class="wpf-window">
+  <div class="wpf-title-bar">
+    <h2>Gestor de Tareas Programadas</h2>
+  </div>
+
+  <div class="wpf-content">
+    <div *ngIf="error" class="wpf-alert error">
+      {{ error }}
+    </div>
+
+    <div class="wpf-toolbar">
+      <button (click)="createNewJob()" class="wpf-button primary">
+        + Nueva Tarea
+      </button>
+      <button (click)="loadJobs()" class="wpf-button secondary" [disabled]="loading">
+        {{ loading ? 'Cargando...' : 'Actualizar' }}
+      </button>
+    </div>
+
+    <div *ngIf="loading && jobs.length === 0" class="loading-container">
+      <div class="wpf-spinner"></div>
+      <p>Cargando tareas...</p>
+    </div>
+
+    <div *ngIf="!loading && jobs.length === 0" class="empty-state">
+      <h3>No hay tareas configuradas</h3>
+      <p>Crea una nueva tarea para comenzar</p>
+      <button (click)="createNewJob()" class="wpf-button primary">
+        + Nueva Tarea
+      </button>
+    </div>
+
+    <div class="wpf-datagrid" *ngIf="jobs.length > 0">
+      <table>
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th>Nombre</th>
+            <th>Código</th>
+            <th>Comando</th>
+            <th>Programación</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let job of jobs" [class.disabled-row]="!job.enabled">
+            <td class="status-cell">
+              <span class="status-indicator" [class.active]="job.enabled" [class.inactive]="!job.enabled">
+                {{ job.enabled ? 'Activa' : 'Inactiva' }}
+              </span>
+            </td>
+            <td class="job-name">{{ job.name }}</td>
+            <td>{{ job.operationCode }}</td>
+            <td class="command-cell">
+              <span class="command-text" [title]="job.command || 'No configurado'">
+                {{ job.command || 'No configurado' }}
+              </span>
+            </td>
+            <td>{{ getScheduleDescription(job) }}</td>
+            <td class="actions-cell">
+              <button (click)="editJob(job.jobId)" class="wpf-button small secondary" title="Editar">
+                Editar
+              </button>
+              <button (click)="toggleJobEnabled(job)" class="wpf-button small"
+                [class.success]="!job.enabled" [class.warning]="job.enabled"
+                [title]="job.enabled ? 'Desactivar' : 'Activar'">
+                {{ job.enabled ? 'Desactivar' : 'Activar' }}
+              </button>
+              <button (click)="viewJobRuns(job.jobId)" class="wpf-button small secondary" title="Ver Ejecuciones">
+                Historial
+              </button>
+              <button (click)="deleteJob(job)" class="wpf-button small danger" title="Eliminar">
+                Eliminar
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

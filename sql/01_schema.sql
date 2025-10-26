@@ -32,3 +32,30 @@ BEGIN
     CreatedUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
   );
 END
+
+IF OBJECT_ID('dbo.Job','U') IS NULL
+BEGIN
+  CREATE TABLE dbo.Job(
+    JobId            int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    Name             nvarchar(200) NOT NULL UNIQUE,
+    OperationCode    nvarchar(100) NOT NULL,
+    Enabled          bit NOT NULL DEFAULT 1,
+    Command          nvarchar(500) NULL,
+    Arguments        nvarchar(1000) NULL,
+    WorkingDirectory nvarchar(500) NULL,
+    ShowWindow       bit NOT NULL DEFAULT 0,
+    Environment      nvarchar(max) NULL
+  );
+END
+
+IF OBJECT_ID('dbo.JobSchedule','U') IS NULL
+BEGIN
+  CREATE TABLE dbo.JobSchedule(
+    JobId            int NOT NULL PRIMARY KEY,
+    ScheduleType     varchar(20) NOT NULL DEFAULT 'MINUTES',
+    IntervalMinutes  int NULL,
+    RunAtTime        time NULL,
+    DaysOfWeekMask   tinyint NULL,
+    FOREIGN KEY (JobId) REFERENCES dbo.Job(JobId) ON DELETE CASCADE
+  );
+END

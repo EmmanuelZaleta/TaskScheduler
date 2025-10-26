@@ -1,0 +1,23 @@
+<div class="app-container">
+  <div class="wpf-window main-window">
+    <div class="wpf-title-bar">
+      <h2>{{ title }}</h2>
+    </div>
+
+    <div class="wpf-menu-bar">
+      <a routerLink="/dashboard" routerLinkActive="active" class="menu-item">
+        Dashboard
+      </a>
+      <a routerLink="/jobs" routerLinkActive="active" class="menu-item">
+        Tareas
+      </a>
+      <a routerLink="/jobs/new" class="menu-item">
+        + Nueva Tarea
+      </a>
+    </div>
+
+    <div class="main-content">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+</div>
