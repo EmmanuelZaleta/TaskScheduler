@@ -9,4 +9,9 @@ public sealed class AutomationOptions
   [Required]
   [MinLength(1)]
   public string ManifestsPath { get; set; } = "automations";
+
+  /// <summary>
+  /// Fuente de automatizaciones: "Database" o "Files"
+  /// </summary>
+  public string Source { get; set; } = "Database";
 }

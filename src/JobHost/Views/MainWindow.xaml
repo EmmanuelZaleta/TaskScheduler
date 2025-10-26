@@ -1,0 +1,189 @@
+<Window x:Class="YCC.SapAutomation.Host.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        mc:Ignorable="d"
+        Title="YCC Job Host - Task Scheduler"
+        Height="700" Width="1100"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterScreen"
+        StateChanged="Window_StateChanged"
+        Closing="Window_Closing">
+
+    <Grid>
+        <!-- Tray Icon -->
+        <tb:TaskbarIcon x:Name="TaskbarIcon"
+                        IconSource="/Resources/app.ico"
+                        ToolTipText="YCC Job Host - Task Scheduler"
+                        TrayMouseDoubleClick="TaskbarIcon_ShowWindow">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Abrir Dashboard" Click="TaskbarIcon_ShowWindow" FontWeight="Bold"/>
+                    <Separator/>
+                    <MenuItem Header="Pausar Scheduler" Click="TaskbarIcon_Pause"/>
+                    <MenuItem Header="Reanudar Scheduler" Click="TaskbarIcon_Resume"/>
+                    <Separator/>
+                    <MenuItem Header="Salir" Click="TaskbarIcon_Exit"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+
+        <!-- Contenido principal -->
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="20,15" CornerRadius="8" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="YCC Job Host" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Sistema de Programación de Tareas" FontSize="14" Foreground="White" Opacity="0.9"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="12" Height="12" Fill="{Binding IsSchedulerRunning, Converter={StaticResource BoolToRunningStatusConverter}}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding SchedulerStatus}" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Estadísticas -->
+            <Grid Grid.Row="1" Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Total Jobs -->
+                <Border Grid.Column="0" Background="White" Padding="20" CornerRadius="8" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Total Jobs" FontSize="12" Foreground="#95A5A6"/>
+                        <TextBlock Text="{Binding TotalJobsScheduled}" FontSize="36" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="Programados" FontSize="11" Foreground="#7F8C8D"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Ejecutados Hoy -->
+                <Border Grid.Column="1" Background="White" Padding="20" CornerRadius="8" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Ejecutados Hoy" FontSize="12" Foreground="#95A5A6"/>
+                        <TextBlock Text="{Binding JobsExecutedToday}" FontSize="36" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"/>
+                        <TextBlock Text="Completados" FontSize="11" Foreground="#7F8C8D"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Fallidos Hoy -->
+                <Border Grid.Column="2" Background="White" Padding="20" CornerRadius="8" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Fallidos Hoy" FontSize="12" Foreground="#95A5A6"/>
+                        <TextBlock Text="{Binding FailedJobsToday}" FontSize="36" FontWeight="Bold" Foreground="{StaticResource DangerBrush}"/>
+                        <TextBlock Text="Con error" FontSize="11" Foreground="#7F8C8D"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Última Ejecución -->
+                <Border Grid.Column="3" Background="White" Padding="20" CornerRadius="8">
+                    <StackPanel>
+                        <TextBlock Text="Última Ejecución" FontSize="12" Foreground="#95A5A6"/>
+                        <TextBlock Text="{Binding LastExecution, Converter={StaticResource DateTimeToDisplayConverter}}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="HH:MM:SS" FontSize="11" Foreground="#7F8C8D"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Ejecuciones Recientes -->
+            <Border Grid.Row="2" Background="White" Padding="20" CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Ejecuciones Recientes" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,15"/>
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding RecentExecutions}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              GridLinesVisibility="None"
+                              HeadersVisibility="Column"
+                              RowHeight="40"
+                              BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Job" Binding="{Binding JobName}" Width="*" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="120">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{Binding StateColor}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Duración" Binding="{Binding Duration}" Width="100"/>
+                            <DataGridTextColumn Header="Exit Code" Binding="{Binding ExitCode}" Width="100"/>
+                            <DataGridTextColumn Header="Hora" Binding="{Binding Timestamp, StringFormat='HH:mm:ss'}" Width="100"/>
+                            <DataGridTextColumn Header="Mensaje" Binding="{Binding Message}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- Controles -->
+            <Border Grid.Row="3" Background="White" Padding="20" CornerRadius="8" Margin="0,20,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <CheckBox Content="Iniciar con Windows"
+                                  IsChecked="{Binding IsAutostartEnabled}"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,20,0"
+                                  Checked="Autostart_Checked"
+                                  Unchecked="Autostart_Checked"/>
+                        <TextBlock Text="La aplicación se iniciará automáticamente al arrancar Windows"
+                                   VerticalAlignment="Center"
+                                   Foreground="#7F8C8D"
+                                   FontSize="11"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="Pausar Scheduler"
+                                Command="{Binding PauseSchedulerCommand}"
+                                Width="140"
+                                Height="36"
+                                Margin="0,0,10,0"
+                                Background="{StaticResource WarningBrush}"/>
+                        <Button Content="Reanudar Scheduler"
+                                Command="{Binding ResumeSchedulerCommand}"
+                                Width="140"
+                                Height="36"
+                                Margin="0,0,10,0"
+                                Background="{StaticResource SuccessBrush}"/>
+                        <Button Content="Refrescar"
+                                Command="{Binding RefreshCommand}"
+                                Width="100"
+                                Height="36"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
