@@ -44,8 +44,11 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<ISqlConnectionFactory>(sp =>
 {
     var configuration = sp.GetRequiredService<IConfiguration>();
-    var connectionString = configuration.GetConnectionString("Sql")
-        ?? throw new InvalidOperationException("SQL connection string not found");
+    var connectionString = configuration.GetConnectionString("Sql");
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new InvalidOperationException("SQL connection string not found");
+    }
     return new SqlConnectionFactory(connectionString);
 });
 

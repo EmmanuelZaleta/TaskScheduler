@@ -254,7 +254,7 @@ internal static class Program
             throw new InvalidOperationException("Failed to get SAP GUI scripting engine");
         }
 
-        return result!;
+        return result;
     }
 
     private static dynamic EnsureConnection(dynamic application, SapLoginOptions options)
