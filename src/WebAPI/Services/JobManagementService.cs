@@ -1,4 +1,5 @@
 using System.Data;
+using System.Linq;
 using Microsoft.Data.SqlClient;
 using YCC.SapAutomation.Abstractions.DbScheduling;
 using YCC.SapAutomation.Infrastructure.Sql;
@@ -29,8 +30,8 @@ public sealed class JobManagementService : IJobManagementService
                 j.JobId, j.Name, j.OperationCode, j.Enabled,
                 j.Command, j.Arguments, j.WorkingDirectory, j.ShowWindow, j.Environment,
                 s.ScheduleType, s.IntervalMinutes, s.RunAtTime, s.DaysOfWeekMask
-            FROM Job j
-            LEFT JOIN JobSchedule s ON j.JobId = s.JobId
+            FROM dbo.Job j
+            LEFT JOIN dbo.JobSchedule s ON j.JobId = s.JobId
             ORDER BY j.Name";
 
         await using var command = new SqlCommand(sql, connection);
@@ -42,6 +43,8 @@ public sealed class JobManagementService : IJobManagementService
         {
             jobs.Add(MapToDto(reader));
         }
+
+        await LoadJobParamsAsync(connection, jobs, cancellationToken);
 
         return jobs;
     }
@@ -55,8 +58,8 @@ public sealed class JobManagementService : IJobManagementService
                 j.JobId, j.Name, j.OperationCode, j.Enabled,
                 j.Command, j.Arguments, j.WorkingDirectory, j.ShowWindow, j.Environment,
                 s.ScheduleType, s.IntervalMinutes, s.RunAtTime, s.DaysOfWeekMask
-            FROM Job j
-            LEFT JOIN JobSchedule s ON j.JobId = s.JobId
+            FROM dbo.Job j
+            LEFT JOIN dbo.JobSchedule s ON j.JobId = s.JobId
             WHERE j.JobId = @JobId";
 
         await using var command = new SqlCommand(sql, connection);
@@ -66,7 +69,9 @@ public sealed class JobManagementService : IJobManagementService
 
         if (await reader.ReadAsync(cancellationToken))
         {
-            return MapToDto(reader);
+            var job = MapToDto(reader);
+            await LoadJobParamsAsync(connection, new[] { job }, cancellationToken);
+            return job;
         }
 
         return null;
@@ -284,6 +289,138 @@ public sealed class JobManagementService : IJobManagementService
         }
 
         return runs;
+    }
+
+    private static async Task LoadJobParamsAsync(SqlConnection connection, IReadOnlyCollection<JobDefinitionDto> jobs, CancellationToken cancellationToken)
+    {
+        if (jobs.Count == 0)
+        {
+            return;
+        }
+
+        var jobArray = jobs.ToArray();
+        var parameterNames = jobArray
+            .Select((job, index) => new { job.JobId, ParameterName = $"@JobId{index}" })
+            .ToArray();
+
+        var sql = $@"
+            SELECT JobId, [Key], [Value]
+            FROM dbo.JobParam
+            WHERE JobId IN ({string.Join(", ", parameterNames.Select(p => p.ParameterName))})";
+
+        await using var command = new SqlCommand(sql, connection);
+        foreach (var parameter in parameterNames)
+        {
+            command.Parameters.AddWithValue(parameter.ParameterName, parameter.JobId);
+        }
+
+        var jobsById = jobArray.ToDictionary(job => job.JobId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var jobId = reader.GetInt32(0);
+            if (!jobsById.TryGetValue(jobId, out var job))
+            {
+                continue;
+            }
+
+            var key = reader.GetString(1);
+            var value = reader.IsDBNull(2) ? null : reader.GetString(2);
+
+            ApplyJobParam(job, key, value);
+        }
+    }
+
+    private static void ApplyJobParam(JobDefinitionDto job, string key, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        if (key.StartsWith("Env:", StringComparison.OrdinalIgnoreCase))
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            job.Environment ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            job.Environment[key.Substring(4)] = value;
+            return;
+        }
+
+        if (key.Equals("Command", StringComparison.OrdinalIgnoreCase))
+        {
+            job.Command = value;
+            return;
+        }
+
+        if (key.Equals("Arguments", StringComparison.OrdinalIgnoreCase))
+        {
+            job.Arguments = value;
+            return;
+        }
+
+        if (key.Equals("WorkingDirectory", StringComparison.OrdinalIgnoreCase))
+        {
+            job.WorkingDirectory = value;
+            return;
+        }
+
+        if (key.Equals("Environment", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            try
+            {
+                var parsed = JsonConvert.DeserializeObject<Dictionary<string, string>>(value);
+                if (parsed is null)
+                {
+                    return;
+                }
+
+                job.Environment ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var kvp in parsed)
+                {
+                    job.Environment[kvp.Key] = kvp.Value;
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore invalid JSON stored in parameters
+            }
+
+            return;
+        }
+
+        if (key.Equals("ShowWindow", StringComparison.OrdinalIgnoreCase))
+        {
+            if (value is null)
+            {
+                job.ShowWindow = false;
+                return;
+            }
+
+            if (bool.TryParse(value, out var boolValue))
+            {
+                job.ShowWindow = boolValue;
+                return;
+            }
+
+            if (int.TryParse(value, out var intValue))
+            {
+                job.ShowWindow = intValue != 0;
+            }
+
+            return;
+        }
     }
 
     private static JobDefinitionDto MapToDto(SqlDataReader reader)
