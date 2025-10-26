@@ -249,7 +249,12 @@ internal static class Program
             .GetType()
             .InvokeMember("GetScriptingEngine", BindingFlags.InvokeMethod, binder: null, target: rotEntry, args: null);
 
-        return result ?? throw new InvalidOperationException("Failed to get SAP GUI scripting engine");
+        if (result is null)
+        {
+            throw new InvalidOperationException("Failed to get SAP GUI scripting engine");
+        }
+
+        return result;
     }
 
     private static dynamic EnsureConnection(dynamic application, SapLoginOptions options)
