@@ -9,10 +9,13 @@ using YCC.SapAutomation.Application.Jobs.ExternalProcess;
 
 namespace YCC.SapAutomation.Application.Automation
 {
-  public sealed class AutomationJobFactory
+  public sealed class AutomationJobFactory : IDisposable
   {
     private readonly IHostEnvironment _environment;
     private readonly ILogger<AutomationJobFactory> _logger;
+    // NOTA: Los assemblies cargados en AssemblyLoadContext.Default no pueden ser descargados
+    // Esto significa que permanecerán en memoria durante toda la vida de la aplicación.
+    // Para aplicaciones de larga duración, considerar usar AssemblyLoadContext coleccionables.
     private readonly ConcurrentDictionary<string, Assembly> _assemblyCache = new();
 
     public AutomationJobFactory(
@@ -107,6 +110,15 @@ namespace YCC.SapAutomation.Application.Automation
       }
 
       return Path.Combine(_environment.ContentRootPath, path);
+    }
+
+    public void Dispose()
+    {
+      // Limpiar el cache de assemblies
+      // Nota: Los assemblies cargados en AssemblyLoadContext.Default no se pueden descargar,
+      // pero al menos liberamos las referencias del diccionario
+      _assemblyCache.Clear();
+      _logger.LogDebug("Cache de assemblies limpiado");
     }
   }
 }

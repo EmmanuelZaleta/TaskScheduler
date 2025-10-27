@@ -9,6 +9,9 @@ namespace YCC.SapAutomation.Application.Jobs.ExternalProcess;
 
 internal static class ExternalProcessExecutor
 {
+  // Límite de líneas para prevenir memory leaks en procesos con output muy largo
+  private const int MaxOutputLines = 10000;
+
   public static async Task<int> RunAsync(ExternalProcessCommand command, ILogger logger, CancellationToken cancellationToken)
   {
     ArgumentNullException.ThrowIfNull(command);
@@ -31,6 +34,8 @@ internal static class ExternalProcessExecutor
 
     var outputBuilder = new List<string>();
     var errorBuilder = new List<string>();
+    var outputTruncated = false;
+    var errorTruncated = false;
 
     var capture = !startInfo.UseShellExecute && (startInfo.RedirectStandardOutput || startInfo.RedirectStandardError);
     if (capture)
@@ -38,12 +43,28 @@ internal static class ExternalProcessExecutor
       process.OutputDataReceived += (_, args) =>
       {
         if (!string.IsNullOrEmpty(args.Data))
-          outputBuilder.Add(args.Data);
+        {
+          if (outputBuilder.Count < MaxOutputLines)
+            outputBuilder.Add(args.Data);
+          else if (!outputTruncated)
+          {
+            outputBuilder.Add($"... Output truncado, se alcanzó el límite de {MaxOutputLines} líneas ...");
+            outputTruncated = true;
+          }
+        }
       };
       process.ErrorDataReceived += (_, args) =>
       {
         if (!string.IsNullOrEmpty(args.Data))
-          errorBuilder.Add(args.Data);
+        {
+          if (errorBuilder.Count < MaxOutputLines)
+            errorBuilder.Add(args.Data);
+          else if (!errorTruncated)
+          {
+            errorBuilder.Add($"... Error truncado, se alcanzó el límite de {MaxOutputLines} líneas ...");
+            errorTruncated = true;
+          }
+        }
       };
     }
 

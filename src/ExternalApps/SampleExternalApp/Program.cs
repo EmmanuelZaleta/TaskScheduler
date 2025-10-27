@@ -238,7 +238,8 @@ internal static class Program
         try
         {
             var info = new ProcessStartInfo(exe) { UseShellExecute = true };
-            Process.Start(info);
+            using var process = Process.Start(info);
+            // No esperamos a que el proceso termine, solo liberamos el handle
         }
         catch (Exception ex)
         {

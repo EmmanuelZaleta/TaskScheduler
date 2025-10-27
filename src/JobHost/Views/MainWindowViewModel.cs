@@ -11,7 +11,7 @@ using YCC.SapAutomation.Host.Utilities;
 
 namespace YCC.SapAutomation.Host.Views;
 
-public sealed class MainWindowViewModel : INotifyPropertyChanged
+public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
   private readonly ISchedulerFactory _schedulerFactory;
   private readonly IJobExecutionNotificationService _notificationService;
@@ -234,6 +234,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
   private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
   {
     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+  }
+
+  public void Dispose()
+  {
+    // Desuscribirse del evento para evitar memory leaks
+    _notificationService.JobExecutionChanged -= OnJobExecutionChanged;
   }
 }
 
