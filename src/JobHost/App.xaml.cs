@@ -14,10 +14,14 @@ namespace YCC.SapAutomation.Host
   public partial class App : System.Windows.Application
   {
     private IHost? _host;
+    private bool _startMinimized = false;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
       base.OnStartup(e);
+
+      // Verificar si se debe iniciar minimizado (parámetro de línea de comandos)
+      _startMinimized = e.Args.Contains("--minimized") || e.Args.Contains("/minimized");
 
       var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
 
@@ -57,7 +61,17 @@ namespace YCC.SapAutomation.Host
       // Mostrar ventana principal
       var win = _host.Services.GetRequiredService<Views.MainWindow>();
       MainWindow = win;
-      win.Show();
+
+      if (_startMinimized)
+      {
+        // Iniciar minimizado a la bandeja del sistema
+        win.WindowState = WindowState.Minimized;
+        win.ShowInTaskbar = false;
+      }
+      else
+      {
+        win.Show();
+      }
     }
 
     protected override async void OnExit(ExitEventArgs e)

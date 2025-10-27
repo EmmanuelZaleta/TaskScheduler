@@ -1,0 +1,22 @@
+# WiX build outputs
+bin/
+obj/
+*.wixobj
+*.wixpdb
+
+# MSI installers (estos se deben generar en CI/CD)
+*.msi
+
+# Logs
+*.log
+install.log
+
+# VS/Rider
+.vs/
+.idea/
+*.suo
+*.user
+
+# Temporary files
+*.tmp
+~$*

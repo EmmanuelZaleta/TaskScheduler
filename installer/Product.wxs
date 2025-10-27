@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <?define ProductName = "YCC Job Host - Task Scheduler" ?>
+  <?define ProductVersion = "1.0.0.0" ?>
+  <?define Manufacturer = "YCC Corporation" ?>
+  <?define UpgradeCode = "{A8B9C7D6-E5F4-4A3B-9C2D-1E8F7A6B5C4D}" ?>
+
+  <Product Id="*"
+           Name="$(var.ProductName)"
+           Language="1033"
+           Version="$(var.ProductVersion)"
+           Manufacturer="$(var.Manufacturer)"
+           UpgradeCode="$(var.UpgradeCode)">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Platform="x64"
+             Description="Sistema profesional de programación de tareas y automatización SAP"
+             Comments="Instalador de YCC Job Host"
+             Manufacturer="$(var.Manufacturer)" />
+
+    <!-- Verificar versión de .NET -->
+    <PropertyRef Id="NETFRAMEWORK48" />
+    <Condition Message="Este instalador requiere .NET Framework 4.8 o superior, o .NET 8.0 Runtime instalado.">
+      <![CDATA[Installed OR NETFRAMEWORK48]]>
+    </Condition>
+
+    <!-- Icono del instalador -->
+    <Icon Id="ProductIcon" SourceFile="icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+
+    <!-- URLs de información del producto -->
+    <Property Id="ARPHELPLINK" Value="https://www.ycc.com/support" />
+    <Property Id="ARPURLINFOABOUT" Value="https://www.ycc.com" />
+
+    <!-- Permitir actualizaciones -->
+    <MajorUpgrade DowngradeErrorMessage="Una versión más reciente de $(var.ProductName) ya está instalada."
+                  AllowSameVersionUpgrades="yes" />
+
+    <!-- Media -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Características -->
+    <Feature Id="ProductFeature"
+             Title="YCC Job Host"
+             Level="1"
+             Description="Aplicación principal de programación de tareas"
+             ConfigurableDirectory="INSTALLFOLDER">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="ConfigurationFiles" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="ApplicationShortcutDesktop" />
+    </Feature>
+
+    <!-- Directorio de instalación -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="CompanyFolder" Name="YCC">
+          <Directory Id="INSTALLFOLDER" Name="JobHost">
+            <Directory Id="LogsFolder" Name="logs" />
+            <Directory Id="AutomationsFolder" Name="automations" />
+            <Directory Id="ScriptsFolder" Name="scripts" />
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <!-- Menú Inicio -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="YCC Job Host"/>
+      </Directory>
+
+      <!-- Escritorio -->
+      <Directory Id="DesktopFolder" Name="Desktop"/>
+    </Directory>
+
+    <!-- Componentes de la aplicación -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <!-- Ejecutable principal -->
+      <Component Id="MainExecutable" Guid="{1A2B3C4D-5E6F-4A5B-8C9D-0E1F2A3B4C5D}" Win64="yes">
+        <File Id="YCC.JobHost.exe"
+              Name="YCC.JobHost.exe"
+              Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\YCC.JobHost.exe"
+              KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut"
+                    Directory="ApplicationProgramsFolder"
+                    Name="YCC Job Host - Task Scheduler"
+                    Description="Sistema de programación de tareas"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="ProductIcon"
+                    Advertise="yes">
+            <ShortcutProperty Key="System.AppUserModel.ID" Value="YCC.JobHost"/>
+          </Shortcut>
+        </File>
+
+        <!-- Registro en inicio automático de Windows -->
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                       Name="YCC.JobHost"
+                       Type="string"
+                       Value='"[INSTALLFOLDER]YCC.JobHost.exe" --minimized'
+                       KeyPath="no" />
+      </Component>
+
+      <!-- DLLs y dependencias - se incluirán automáticamente desde el directorio publish -->
+      <Component Id="Dependencies" Guid="{2B3C4D5E-6F7A-4B5C-9D0E-1F2A3B4C5D6E}" Win64="yes">
+        <File Id="YCC.SapAutomation.Application.dll" Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\YCC.SapAutomation.Application.dll" />
+        <File Id="YCC.SapAutomation.Infrastructure.dll" Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\YCC.SapAutomation.Infrastructure.dll" />
+        <File Id="YCC.SapAutomation.Domain.dll" Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\YCC.SapAutomation.Domain.dll" />
+        <File Id="YCC.SapAutomation.Abstractions.dll" Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\YCC.SapAutomation.Abstractions.dll" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Archivos de configuración -->
+    <ComponentGroup Id="ConfigurationFiles" Directory="INSTALLFOLDER">
+      <Component Id="AppSettingsJson" Guid="{3C4D5E6F-7A8B-4C5D-0E1F-2A3B4C5D6E7F}" Win64="yes">
+        <File Id="appsettings.json" Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\appsettings.json" />
+      </Component>
+
+      <Component Id="AppSettingsProductionJson" Guid="{4D5E6F7A-8B9C-4D5E-1F2A-3B4C5D6E7F8A}" Win64="yes">
+        <File Id="appsettings.Production.json" Source="..\src\JobHost\bin\Release\net8.0-windows\win-x64\publish\appsettings.Production.json" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Acceso directo en escritorio -->
+    <Component Id="ApplicationShortcutDesktop" Directory="DesktopFolder" Guid="{5E6F7A8B-9C0D-4E5F-2A3B-4C5D6E7F8A9B}">
+      <Shortcut Id="DesktopShortcut"
+                Name="YCC Job Host"
+                Description="Sistema de programación de tareas"
+                Target="[INSTALLFOLDER]YCC.JobHost.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="ProductIcon">
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="YCC.JobHost"/>
+      </Shortcut>
+      <RemoveFolder Id="DesktopFolder" On="uninstall"/>
+      <RegistryValue Root="HKCU" Key="Software\YCC\JobHost" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes"/>
+    </Component>
+
+    <!-- Acceso directo menú inicio -->
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="{6F7A8B9C-0D1E-4F5A-3B4C-5D6E7F8A9B0C}">
+      <Shortcut Id="UninstallProduct"
+                Name="Desinstalar YCC Job Host"
+                Description="Desinstalar YCC Job Host - Task Scheduler"
+                Target="[SystemFolder]msiexec.exe"
+                Arguments="/x [ProductCode]"/>
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+      <RegistryValue Root="HKCU" Key="Software\YCC\JobHost" Name="Installed" Type="integer" Value="1" KeyPath="yes"/>
+    </Component>
+
+    <!-- Interfaz de usuario del instalador -->
+    <UI Id="UserInterface">
+      <UIRef Id="WixUI_InstallDir" />
+      <UIRef Id="WixUI_ErrorProgressText" />
+
+      <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+      <!-- Personalización del diálogo -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+    </UI>
+
+    <!-- Textos de licencia (opcional) -->
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+    <!-- Imágenes del instalador (opcional) -->
+    <!-- <WixVariable Id="WixUIBannerBmp" Value="Banner.bmp" /> -->
+    <!-- <WixVariable Id="WixUIDialogBmp" Value="Dialog.bmp" /> -->
+
+    <!-- Acciones personalizadas -->
+    <CustomAction Id="LaunchApplication"
+                  FileKey="YCC.JobHost.exe"
+                  ExeCommand="--minimized"
+                  Execute="immediate"
+                  Impersonate="yes"
+                  Return="asyncNoWait" />
+
+    <!-- Secuencia de instalación -->
+    <InstallExecuteSequence>
+      <Custom Action="LaunchApplication" After="InstallFinalize">
+        NOT Installed AND NOT REMOVE
+      </Custom>
+    </InstallExecuteSequence>
+
+    <!-- Crear carpetas necesarias -->
+    <DirectoryRef Id="LogsFolder">
+      <Component Id="LogsDirectory" Guid="{7A8B9C0D-1E2F-4A5B-4C5D-6E7F8A9B0C1D}" Win64="yes">
+        <CreateFolder>
+          <util:PermissionEx User="Users" GenericAll="yes" />
+        </CreateFolder>
+        <RemoveFolder Id="LogsFolder" On="uninstall"/>
+        <RegistryValue Root="HKCU" Key="Software\YCC\JobHost" Name="LogsFolder" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="AutomationsFolder">
+      <Component Id="AutomationsDirectory" Guid="{8B9C0D1E-2F3A-4B5C-5D6E-7F8A9B0C1D2E}" Win64="yes">
+        <CreateFolder>
+          <util:PermissionEx User="Users" GenericAll="yes" />
+        </CreateFolder>
+        <RemoveFolder Id="AutomationsFolder" On="uninstall"/>
+        <RegistryValue Root="HKCU" Key="Software\YCC\JobHost" Name="AutomationsFolder" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ScriptsFolder">
+      <Component Id="ScriptsDirectory" Guid="{9C0D1E2F-3A4B-4C5D-6E7F-8A9B0C1D2E3F}" Win64="yes">
+        <CreateFolder>
+          <util:PermissionEx User="Users" GenericAll="yes" />
+        </CreateFolder>
+        <RemoveFolder Id="ScriptsFolder" On="uninstall"/>
+        <RegistryValue Root="HKCU" Key="Software\YCC\JobHost" Name="ScriptsFolder" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <!-- Agregar componentes de carpetas a la característica -->
+    <FeatureRef Id="ProductFeature">
+      <ComponentRef Id="LogsDirectory" />
+      <ComponentRef Id="AutomationsDirectory" />
+      <ComponentRef Id="ScriptsDirectory" />
+    </FeatureRef>
+
+  </Product>
+</Wix>

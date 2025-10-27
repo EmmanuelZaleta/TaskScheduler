@@ -16,7 +16,8 @@ public static class StartupHelper
       if (string.IsNullOrEmpty(exePath))
         return false;
 
-      Registry.SetValue(RunKey, AppName, $"\"{exePath}\"", RegistryValueKind.String);
+      // Registrar con parámetro --minimized para iniciar en segundo plano
+      Registry.SetValue(RunKey, AppName, $"\"{exePath}\" --minimized", RegistryValueKind.String);
       return true;
     }
     catch
