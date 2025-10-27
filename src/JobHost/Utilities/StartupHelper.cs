@@ -29,8 +29,8 @@ public static class StartupHelper
   {
     try
     {
-      Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true)
-        ?.DeleteValue(AppName, throwOnMissingValue: false);
+      using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+      key?.DeleteValue(AppName, throwOnMissingValue: false);
       return true;
     }
     catch

@@ -38,7 +38,7 @@ public sealed class SqlJobDefinitionStore : IJobDefinitionStore
       throw;
     }
 
-    var jobsCmd = cn.CreateCommand();
+    await using var jobsCmd = cn.CreateCommand();
     jobsCmd.CommandText = @"
 SELECT j.JobId, j.Name, j.OperationCode,
        js.ScheduleType, js.IntervalMinutes, js.RunAtTime, js.DaysOfWeekMask
@@ -70,7 +70,7 @@ WHERE j.Enabled = 1";
 
     foreach (var j in jobs)
     {
-      var paramCmd = cn.CreateCommand();
+      await using var paramCmd = cn.CreateCommand();
       paramCmd.CommandText = "SELECT [Key],[Value] FROM dbo.JobParam WHERE JobId=@id";
       paramCmd.Parameters.Add(new SqlParameter("@id", SqlDbType.Int){Value=j.JobId});
       var env = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);

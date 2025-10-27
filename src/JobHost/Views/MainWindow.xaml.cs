@@ -72,4 +72,12 @@ public partial class MainWindow : Window
       _viewModel.IsAutostartEnabled = cb.IsChecked == true;
     }
   }
+
+  protected override void OnClosed(EventArgs e)
+  {
+    // Cleanup para evitar memory leaks
+    Loaded -= MainWindow_Loaded;
+    _viewModel?.Dispose();
+    base.OnClosed(e);
+  }
 }
