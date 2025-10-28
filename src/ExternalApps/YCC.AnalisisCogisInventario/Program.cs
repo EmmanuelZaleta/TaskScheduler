@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using SAPFEWSELib;
 
 // P/Invoke para GetActiveObject (no disponible en .NET 8)
 internal static class NativeMethods
@@ -71,21 +72,20 @@ internal static class Program
     {
         Console.WriteLine($"{Timestamp()} Conectando a SAP GUI...");
 
-        dynamic? sapGuiAuto = null;
-        dynamic? application = null;
-        dynamic? connection = null;
-        dynamic? session = null;
+        GuiApplication? application = null;
+        GuiConnection? connection = null;
+        GuiSession? session = null;
 
         try
         {
-            // Conectar a SAP GUI existente
-            sapGuiAuto = GetObject("SAPGUI");
+            // Conectar a SAP GUI existente usando SAPFEWSELib
+            var sapGuiAuto = GetObject("SAPGUI") as GuiApplication;
             if (sapGuiAuto == null)
             {
                 throw new InvalidOperationException("No se pudo conectar a SAP GUI. Asegurese de que SAP GUI este abierto.");
             }
 
-            application = sapGuiAuto.GetScriptingEngine();
+            application = sapGuiAuto.GetScriptingEngine as GuiApplication;
             if (application == null)
             {
                 throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
@@ -94,26 +94,32 @@ internal static class Program
             Console.WriteLine($"{Timestamp()} SAP GUI encontrado.");
 
             // Verificar si hay conexiones
-            int connectionCount = Convert.ToInt32(application.Children.Count);
-            if (connectionCount == 0)
+            if (application.Children.Count == 0)
             {
                 throw new InvalidOperationException("No hay conexiones SAP abiertas. Por favor, inicie sesion en SAP primero.");
             }
 
             // Usar la primera conexion
-            connection = application.Children(0);
-            Console.WriteLine($"{Timestamp()} Conexion encontrada: {TryGet(() => (string?)connection.Description) ?? "N/A"}");
+            connection = application.Children.ElementAt(0) as GuiConnection;
+            if (connection == null)
+            {
+                throw new InvalidOperationException("No se pudo obtener la conexion SAP.");
+            }
+            Console.WriteLine($"{Timestamp()} Conexion encontrada: {TryGet(() => connection.Description) ?? "N/A"}");
 
             // Verificar si hay sesiones
-            int sessionCount = Convert.ToInt32(connection.Children.Count);
-            if (sessionCount == 0)
+            if (connection.Children.Count == 0)
             {
                 throw new InvalidOperationException("No hay sesiones activas en la conexion SAP.");
             }
 
             // Usar la primera sesion
-            session = connection.Children(0);
-            var currentUser = TryGet(() => (string?)session.Info.User) ?? "desconocido";
+            session = connection.Children.ElementAt(0) as GuiSession;
+            if (session == null)
+            {
+                throw new InvalidOperationException("No se pudo obtener la sesion SAP.");
+            }
+            var currentUser = TryGet(() => session.Info.User) ?? "desconocido";
             Console.WriteLine($"{Timestamp()} Sesion encontrada. Usuario: {currentUser}");
 
             // Crear una nueva ventana/sesion si es necesario
@@ -121,14 +127,15 @@ internal static class Program
             try
             {
                 // Intentar crear una nueva sesion
+                int sessionCount = connection.Children.Count;
                 session.CreateSession();
                 Thread.Sleep(2000); // Esperar a que la nueva ventana se abra
 
                 // Obtener la nueva sesion
-                int newSessionCount = Convert.ToInt32(connection.Children.Count);
+                int newSessionCount = connection.Children.Count;
                 if (newSessionCount > sessionCount)
                 {
-                    session = connection.Children(newSessionCount - 1);
+                    session = connection.Children.ElementAt(newSessionCount - 1) as GuiSession;
                     Console.WriteLine($"{Timestamp()} Nueva ventana creada exitosamente.");
                 }
             }
@@ -137,48 +144,83 @@ internal static class Program
                 Console.WriteLine($"{Timestamp()} Advertencia: No se pudo crear nueva ventana. Usando ventana actual. Error: {ex.Message}");
             }
 
+            if (session == null)
+            {
+                throw new InvalidOperationException("La sesion SAP no es valida.");
+            }
+
             // Ejecutar el script COGI
             Console.WriteLine($"{Timestamp()} Ejecutando transaccion COGI...");
 
             // Maximizar ventana
-            ExecuteSapCommand(() => session.findById("wnd[0]").maximize(), "Maximizar ventana");
+            ExecuteSapCommand(() =>
+            {
+                var mainWindow = session.FindById("wnd[0]") as GuiFrameWindow;
+                mainWindow?.Maximize();
+            }, "Maximizar ventana");
 
             // Ingresar codigo de transaccion COGI
             ExecuteSapCommand(() =>
             {
-                session.findById("wnd[0]/tbar[0]/okcd").text = "COGI";
+                var okcdField = session.FindById("wnd[0]/tbar[0]/okcd") as GuiTextField;
+                if (okcdField != null)
+                    okcdField.Text = "COGI";
             }, "Ingresar codigo de transaccion COGI");
 
             // Presionar Enter
-            ExecuteSapCommand(() => session.findById("wnd[0]").sendVKey(0), "Ejecutar transaccion");
+            ExecuteSapCommand(() =>
+            {
+                var mainWindow = session.FindById("wnd[0]") as GuiFrameWindow;
+                mainWindow?.SendVKey(0);
+            }, "Ejecutar transaccion");
             Thread.Sleep(1500);
 
             // Ingresar centro 1815
             ExecuteSapCommand(() =>
             {
-                session.findById("wnd[0]/usr/ctxtS_WERKS-LOW").text = "1815";
+                var werksField = session.FindById("wnd[0]/usr/ctxtS_WERKS-LOW") as GuiCTextField;
+                if (werksField != null)
+                    werksField.Text = "1815";
             }, "Ingresar centro 1815");
 
             // Presionar boton ejecutar (btn[8])
-            ExecuteSapCommand(() => session.findById("wnd[0]/tbar[1]/btn[8]").press(), "Ejecutar consulta");
+            ExecuteSapCommand(() =>
+            {
+                var executeButton = session.FindById("wnd[0]/tbar[1]/btn[8]") as GuiButton;
+                executeButton?.Press();
+            }, "Ejecutar consulta");
             Thread.Sleep(2000);
 
             // Presionar boton exportar (btn[20])
-            ExecuteSapCommand(() => session.findById("wnd[0]/tbar[1]/btn[20]").press(), "Abrir dialogo de exportacion");
+            ExecuteSapCommand(() =>
+            {
+                var exportButton = session.FindById("wnd[0]/tbar[1]/btn[20]") as GuiButton;
+                exportButton?.Press();
+            }, "Abrir dialogo de exportacion");
             Thread.Sleep(1000);
 
             // Confirmar exportacion (wnd[1]/tbar[0]/btn[0])
-            ExecuteSapCommand(() => session.findById("wnd[1]/tbar[0]/btn[0]").press(), "Confirmar tipo de exportacion");
+            ExecuteSapCommand(() =>
+            {
+                var confirmButton = session.FindById("wnd[1]/tbar[0]/btn[0]") as GuiButton;
+                confirmButton?.Press();
+            }, "Confirmar tipo de exportacion");
             Thread.Sleep(1000);
 
             // Ingresar nombre de archivo
             ExecuteSapCommand(() =>
             {
-                session.findById("wnd[1]/usr/ctxtDY_FILENAME").text = "cogi.txt";
+                var filenameField = session.FindById("wnd[1]/usr/ctxtDY_FILENAME") as GuiCTextField;
+                if (filenameField != null)
+                    filenameField.Text = "cogi.txt";
             }, "Especificar nombre de archivo: cogi.txt");
 
             // Guardar archivo (wnd[1]/tbar[0]/btn[11])
-            ExecuteSapCommand(() => session.findById("wnd[1]/tbar[0]/btn[11]").press(), "Guardar archivo");
+            ExecuteSapCommand(() =>
+            {
+                var saveButton = session.FindById("wnd[1]/tbar[0]/btn[11]") as GuiButton;
+                saveButton?.Press();
+            }, "Guardar archivo");
             Thread.Sleep(1500);
 
             Console.WriteLine($"{Timestamp()} Script COGI ejecutado exitosamente.");
@@ -189,7 +231,6 @@ internal static class Program
             ReleaseComObject(session);
             ReleaseComObject(connection);
             ReleaseComObject(application);
-            ReleaseComObject(sapGuiAuto);
         }
     }
 
