@@ -3,13 +3,13 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 // P/Invoke para GetActiveObject (no disponible en .NET 8)
-internal static partial class NativeMethods
+internal static class NativeMethods
 {
-    [LibraryImport("oleaut32.dll", StringMarshalling = StringMarshalling.Utf16)]
-    private static partial int CLSIDFromProgID(string lpszProgID, out Guid pclsid);
+    [DllImport("oleaut32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
+    private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid pclsid);
 
-    [LibraryImport("ole32.dll")]
-    private static partial int GetActiveObject(in Guid rclsid, IntPtr pvReserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+    [DllImport("ole32.dll", PreserveSig = true)]
+    private static extern int GetActiveObject(in Guid rclsid, IntPtr pvReserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
 
     [SupportedOSPlatform("windows")]
     public static object GetActiveObject(string progId)
