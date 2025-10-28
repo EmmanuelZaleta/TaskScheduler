@@ -10,3 +10,6 @@ artifacts/
 *.dbmdl
 *.jfm
 /packages/
+
+# SAP COM Interop DLLs (deben copiarse manualmente)
+src/Sap/lib/*.dll

@@ -1,9 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
@@ -16,5 +18,15 @@
   <ItemGroup>
     <ProjectReference Include="..\\Abstractions\\YCC.SapAutomation.Abstractions.csproj" />
     <ProjectReference Include="..\\Domain\\YCC.SapAutomation.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Interop.SAPFEWSELib">
+      <HintPath>lib\Interop.SAPFEWSELib.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="Interop.SapROTWr">
+      <HintPath>lib\Interop.SapROTWr.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
   </ItemGroup>
 </Project>
