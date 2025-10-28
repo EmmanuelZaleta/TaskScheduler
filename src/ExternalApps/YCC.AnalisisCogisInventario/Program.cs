@@ -79,13 +79,14 @@ internal static class Program
         try
         {
             // Conectar a SAP GUI existente usando SAPFEWSELib
-            var sapGuiAuto = GetObject("SAPGUI") as GuiApplication;
+            dynamic sapGuiAuto = GetObject("SAPGUI");
             if (sapGuiAuto == null)
             {
                 throw new InvalidOperationException("No se pudo conectar a SAP GUI. Asegurese de que SAP GUI este abierto.");
             }
 
-            application = sapGuiAuto.GetScriptingEngine as GuiApplication;
+            object scriptingEngine = sapGuiAuto.GetScriptingEngine;
+            application = scriptingEngine as GuiApplication;
             if (application == null)
             {
                 throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
