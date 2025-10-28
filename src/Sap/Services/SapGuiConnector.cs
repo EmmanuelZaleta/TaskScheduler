@@ -1,10 +1,10 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SAPFEWSELib;
-using SapROTWr;
 using YCC.SapAutomation.Sap.Contracts;
 using YCC.SapAutomation.Sap.Options;
 
@@ -19,7 +19,7 @@ public sealed class SapGuiConnector : ISapGuiConnector
     private readonly ILogger<SapGuiConnector> _logger;
     private readonly SapOptions _options;
     private GuiApplication? _application;
-    private SapROTWrapper? _rotWrapper;
+    private object? _rotWrapper;
     private bool _disposed;
 
     public SapGuiConnector(
@@ -57,7 +57,12 @@ public sealed class SapGuiConnector : ISapGuiConnector
         {
             _logger.LogInformation("Conectando con SAP GUI Scripting Engine...");
 
-            _rotWrapper = new SapROTWrapper();
+            _rotWrapper = CreateRotWrapper();
+            if (_rotWrapper is null)
+            {
+                _logger.LogError("No se pudo crear la instancia de SapROTWr.SapROTWrapper. ¿Está instalado SAP GUI?");
+                return false;
+            }
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(timeoutSeconds);
             var launched = false;
 
@@ -65,10 +70,16 @@ public sealed class SapGuiConnector : ISapGuiConnector
             {
                 try
                 {
-                    var rotEntry = _rotWrapper.GetROTEntry("SAPGUI");
+                    var rotEntry = InvokeComMethod(_rotWrapper, "GetROTEntry", "SAPGUI");
                     if (rotEntry is not null)
                     {
-                        _application = (GuiApplication)rotEntry.GetScriptingEngine();
+                        var scriptingEngine = InvokeComMethod(rotEntry, "GetScriptingEngine");
+                        if (scriptingEngine is null)
+                        {
+                            throw new InvalidOperationException("El ROT no devolvió el motor de scripting de SAP GUI.");
+                        }
+
+                        _application = (GuiApplication)scriptingEngine;
                         _logger.LogInformation("Conectado exitosamente a SAP GUI");
                         return true;
                     }
@@ -76,6 +87,10 @@ public sealed class SapGuiConnector : ISapGuiConnector
                 catch (COMException ex)
                 {
                     _logger.LogTrace("SAP GUI aún no está disponible: {Message}", ex.Message);
+                }
+                catch (TargetInvocationException ex) when (ex.InnerException is COMException comEx)
+                {
+                    _logger.LogTrace("SAP GUI aún no está disponible: {Message}", comEx.Message);
                 }
 
                 if (!launched && startIfNotRunning)
@@ -392,6 +407,41 @@ public sealed class SapGuiConnector : ISapGuiConnector
         catch
         {
             // No hay popup
+        }
+    }
+
+    private static object? InvokeComMethod(object target, string methodName, params object?[] args)
+    {
+        try
+        {
+            return target.GetType().InvokeMember(
+                methodName,
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.InvokeMethod,
+                null,
+                target,
+                args);
+        }
+        catch (MissingMethodException)
+        {
+            return null;
+        }
+    }
+
+    private static object? CreateRotWrapper()
+    {
+        var rotType = Type.GetTypeFromProgID("SapROTWr.SapROTWrapper", throwOnError: false);
+        if (rotType is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Activator.CreateInstance(rotType);
+        }
+        catch
+        {
+            return null;
         }
     }
 }

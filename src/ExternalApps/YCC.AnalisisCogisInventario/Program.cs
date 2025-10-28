@@ -119,7 +119,7 @@ internal static class Program
             throw new InvalidOperationException("No se pudo conectar a SAP GUI. Asegurese de que SAP GUI este abierto.");
         }
 
-        var app = sapGuiAuto.GetScriptingEngine as GuiApplication;
+        var app = sapGuiAuto.GetScriptingEngine() as GuiApplication;
         if (app == null)
         {
             throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
