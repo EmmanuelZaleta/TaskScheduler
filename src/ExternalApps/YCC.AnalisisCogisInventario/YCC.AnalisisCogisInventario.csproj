@@ -15,6 +15,15 @@
 	    <Isolated>false</Isolated>
 	    <EmbedInteropTypes>true</EmbedInteropTypes>
 	  </COMReference>
+	  <COMReference Include="SAPROTWr">
+	    <WrapperTool>tlbimp</WrapperTool>
+	    <VersionMinor>0</VersionMinor>
+	    <VersionMajor>1</VersionMajor>
+	    <Guid>e3b71e82-e5dd-4c35-9b38-a85333a422de</Guid>
+	    <Lcid>0</Lcid>
+	    <Isolated>false</Isolated>
+	    <EmbedInteropTypes>true</EmbedInteropTypes>
+	  </COMReference>
 	</ItemGroup>
 
 	<ItemGroup>

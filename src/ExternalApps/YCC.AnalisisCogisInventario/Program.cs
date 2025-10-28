@@ -1,37 +1,9 @@
+using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading;
 using SAPFEWSELib;
-
-// P/Invoke para GetActiveObject (no disponible en .NET 8)
-internal static class NativeMethods
-{
-    // CLSIDFromProgID is exported by ole32.dll (not oleaut32.dll). Using the
-    // correct module prevents a runtime entry-point lookup failure on Windows.
-    [DllImport("ole32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
-    private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid pclsid);
-
-    [DllImport("ole32.dll", PreserveSig = true)]
-    private static extern int GetActiveObject(in Guid rclsid, IntPtr pvReserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
-
-    [SupportedOSPlatform("windows")]
-    public static object GetActiveObject(string progId)
-    {
-        int hr = CLSIDFromProgID(progId, out Guid clsid);
-        if (hr < 0)
-        {
-            throw new COMException($"No se pudo obtener CLSID para ProgID: {progId}", hr);
-        }
-
-        hr = GetActiveObject(in clsid, IntPtr.Zero, out object obj);
-        if (hr < 0)
-        {
-            throw new COMException($"No se pudo obtener instancia activa de: {progId}", hr);
-        }
-
-        return obj;
-    }
-}
 
 internal static class Program
 {
@@ -115,20 +87,42 @@ internal static class Program
     [SupportedOSPlatform("windows")]
     private static GuiApplication GetSapApplication()
     {
-        var sapGuiAuto = GetObject("SAPGUI") as GuiApplication;
-        if (sapGuiAuto == null)
+        var rotType = Type.GetTypeFromProgID("SapROTWr.SapROTWrapper");
+        if (rotType is null)
         {
-            throw new InvalidOperationException("No se pudo conectar a SAP GUI. Asegurese de que SAP GUI este abierto.");
+            throw new InvalidOperationException("No se encontro la libreria SapROTWr. Instala SAP GUI con scripting habilitado.");
         }
 
-        var app = sapGuiAuto.GetScriptingEngine() as GuiApplication;
-        if (app == null)
+        dynamic? rot = null;
+        dynamic? rotEntry = null;
+        try
         {
-            throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
-        }
+            rot = Activator.CreateInstance(rotType);
+            if (rot is null)
+            {
+                throw new InvalidOperationException("No se pudo crear instancia de SapROTWr.SapROTWrapper.");
+            }
 
-        Console.WriteLine($"{Timestamp()} SAP GUI encontrado.");
-        return app;
+            rotEntry = rot.GetROTEntry("SAPGUI");
+            if (rotEntry is null)
+            {
+                throw new InvalidOperationException("No se pudo obtener entrada SAP GUI del ROT. Asegurese de que SAP GUI este abierto.");
+            }
+
+            var scriptingEngine = rotEntry.GetScriptingEngine();
+            if (scriptingEngine is null)
+            {
+                throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
+            }
+
+            Console.WriteLine($"{Timestamp()} SAP GUI encontrado.");
+            return (GuiApplication)scriptingEngine;
+        }
+        finally
+        {
+            ReleaseComObject(rotEntry);
+            ReleaseComObject(rot);
+        }
     }
 
     [SupportedOSPlatform("windows")]
@@ -321,16 +315,6 @@ internal static class Program
         {
             return null;
         }
-    }
-
-    [SupportedOSPlatform("windows")]
-    private static dynamic GetObject(string progId)
-    {
-        // Obtener la instancia activa del objeto COM
-        // No es necesario verificar Type.GetTypeFromProgID ya que GetActiveObject
-        // maneja la verificacion y error apropiadamente
-        object obj = NativeMethods.GetActiveObject(progId);
-        return obj;
     }
 
     private static void ReleaseComObject(object? value)
