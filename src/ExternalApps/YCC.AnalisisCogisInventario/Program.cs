@@ -2,6 +2,34 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
+// P/Invoke para GetActiveObject (no disponible en .NET 8)
+internal static partial class NativeMethods
+{
+    [LibraryImport("oleaut32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int CLSIDFromProgID(string lpszProgID, out Guid pclsid);
+
+    [LibraryImport("ole32.dll")]
+    private static partial int GetActiveObject(in Guid rclsid, IntPtr pvReserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+
+    [SupportedOSPlatform("windows")]
+    public static object GetActiveObject(string progId)
+    {
+        int hr = CLSIDFromProgID(progId, out Guid clsid);
+        if (hr < 0)
+        {
+            throw new COMException($"No se pudo obtener CLSID para ProgID: {progId}", hr);
+        }
+
+        hr = GetActiveObject(in clsid, IntPtr.Zero, out object obj);
+        if (hr < 0)
+        {
+            throw new COMException($"No se pudo obtener instancia activa de: {progId}", hr);
+        }
+
+        return obj;
+    }
+}
+
 internal static class Program
 {
     public static int Main(string[] args)
@@ -191,12 +219,7 @@ internal static class Program
             throw new InvalidOperationException($"No se pudo obtener el tipo COM para ProgID: {progId}");
         }
 
-        object? obj = Marshal.GetActiveObject(progId);
-        if (obj == null)
-        {
-            throw new InvalidOperationException($"No se pudo obtener una instancia activa de: {progId}");
-        }
-
+        object obj = NativeMethods.GetActiveObject(progId);
         return obj;
     }
 
