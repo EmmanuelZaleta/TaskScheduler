@@ -14,19 +14,30 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\\Abstractions\\YCC.SapAutomation.Abstractions.csproj" />
     <ProjectReference Include="..\\Domain\\YCC.SapAutomation.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Interop.SAPFEWSELib">
-      <HintPath>lib\Interop.SAPFEWSELib.dll</HintPath>
+    <COMReference Include="SAPFEWSELib">
+      <WrapperTool>tlbimp</WrapperTool>
+      <VersionMinor>0</VersionMinor>
+      <VersionMajor>1</VersionMajor>
+      <Guid>5ea428a0-f2b8-45e7-99fa-0e994e82b5bc</Guid>
+      <Lcid>0</Lcid>
+      <Isolated>false</Isolated>
       <EmbedInteropTypes>false</EmbedInteropTypes>
-    </Reference>
-    <Reference Include="Interop.SapROTWr">
-      <HintPath>lib\Interop.SapROTWr.dll</HintPath>
+    </COMReference>
+    <COMReference Include="SAPROTWr">
+      <WrapperTool>tlbimp</WrapperTool>
+      <VersionMinor>0</VersionMinor>
+      <VersionMajor>1</VersionMajor>
+      <Guid>e3b71e82-e5dd-4c35-9b38-a85333a422de</Guid>
+      <Lcid>0</Lcid>
+      <Isolated>false</Isolated>
       <EmbedInteropTypes>false</EmbedInteropTypes>
-    </Reference>
+    </COMReference>
   </ItemGroup>
 </Project>

@@ -91,7 +91,7 @@ internal static class Program
         string sapUser = GetConfigValue("SAP_User", "90022817");
         string sapPassword = GetConfigValue("SAP_Password", "Yazaki202512345");
         string sapLang = GetConfigValue("SAP_Language", "ES");
-        string? sapGuiPath = GetConfigValue("SAP_GuiPath", null);
+        string? sapGuiPath = GetConfigValue("SAP_GuiPath", string.Empty);
         int sapTimeoutSeconds = GetConfigInt("SAP_TimeoutSeconds", 45);
 
         for (int i = 0; i < args.Length; i++)
