@@ -213,12 +213,9 @@ internal static class Program
     [SupportedOSPlatform("windows")]
     private static dynamic GetObject(string progId)
     {
-        Type? type = Type.GetTypeFromProgID(progId);
-        if (type == null)
-        {
-            throw new InvalidOperationException($"No se pudo obtener el tipo COM para ProgID: {progId}");
-        }
-
+        // Obtener la instancia activa del objeto COM
+        // No es necesario verificar Type.GetTypeFromProgID ya que GetActiveObject
+        // maneja la verificacion y error apropiadamente
         object obj = NativeMethods.GetActiveObject(progId);
         return obj;
     }
