@@ -1,6 +1,6 @@
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Threading;
 using SAPFEWSELib;
 
 // P/Invoke para GetActiveObject (no disponible en .NET 8)
@@ -78,154 +78,29 @@ internal static class Program
 
         try
         {
-            // Conectar a SAP GUI existente usando SAPFEWSELib
-            dynamic sapGuiAuto = GetObject("SAPGUI");
-            if (sapGuiAuto == null)
-            {
-                throw new InvalidOperationException("No se pudo conectar a SAP GUI. Asegurese de que SAP GUI este abierto.");
-            }
+            application = GetSapApplication();
 
-            object scriptingEngine = sapGuiAuto.GetScriptingEngine;
-            application = scriptingEngine as GuiApplication;
-            if (application == null)
-            {
-                throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
-            }
-
-            Console.WriteLine($"{Timestamp()} SAP GUI encontrado.");
-
-            // Verificar si hay conexiones
             if (application.Children.Count == 0)
             {
                 throw new InvalidOperationException("No hay conexiones SAP abiertas. Por favor, inicie sesion en SAP primero.");
             }
 
-            // Usar la primera conexion
-            connection = application.Children.ElementAt(0) as GuiConnection;
-            if (connection == null)
-            {
-                throw new InvalidOperationException("No se pudo obtener la conexion SAP.");
-            }
+            connection = application.Children.ElementAt(0) as GuiConnection
+                ?? throw new InvalidOperationException("No se pudo obtener la conexion SAP.");
+
             Console.WriteLine($"{Timestamp()} Conexion encontrada: {TryGet(() => connection.Description) ?? "N/A"}");
 
-            // Verificar si hay sesiones
             if (connection.Children.Count == 0)
             {
                 throw new InvalidOperationException("No hay sesiones activas en la conexion SAP.");
             }
 
-            // Usar la primera sesion
-            session = connection.Children.ElementAt(0) as GuiSession;
-            if (session == null)
-            {
-                throw new InvalidOperationException("No se pudo obtener la sesion SAP.");
-            }
-            var currentUser = TryGet(() => session.Info.User) ?? "desconocido";
-            Console.WriteLine($"{Timestamp()} Sesion encontrada. Usuario: {currentUser}");
+            session = connection.Children.ElementAt(0) as GuiSession
+                ?? throw new InvalidOperationException("No se pudo obtener la sesion SAP.");
 
-            // Crear una nueva ventana/sesion si es necesario
-            Console.WriteLine($"{Timestamp()} Creando nueva ventana SAP...");
-            try
-            {
-                // Intentar crear una nueva sesion
-                int sessionCount = connection.Children.Count;
-                session.CreateSession();
-                Thread.Sleep(2000); // Esperar a que la nueva ventana se abra
+            Console.WriteLine($"{Timestamp()} Sesion encontrada. Usuario: {TryGet(() => session.Info.User) ?? "desconocido"}");
 
-                // Obtener la nueva sesion
-                int newSessionCount = connection.Children.Count;
-                if (newSessionCount > sessionCount)
-                {
-                    session = connection.Children.ElementAt(newSessionCount - 1) as GuiSession;
-                    Console.WriteLine($"{Timestamp()} Nueva ventana creada exitosamente.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"{Timestamp()} Advertencia: No se pudo crear nueva ventana. Usando ventana actual. Error: {ex.Message}");
-            }
-
-            if (session == null)
-            {
-                throw new InvalidOperationException("La sesion SAP no es valida.");
-            }
-
-            // Ejecutar el script COGI
-            Console.WriteLine($"{Timestamp()} Ejecutando transaccion COGI...");
-
-            // Maximizar ventana
-            ExecuteSapCommand(() =>
-            {
-                var mainWindow = session.FindById("wnd[0]") as GuiFrameWindow;
-                mainWindow?.Maximize();
-            }, "Maximizar ventana");
-
-            // Ingresar codigo de transaccion COGI
-            ExecuteSapCommand(() =>
-            {
-                var okcdField = session.FindById("wnd[0]/tbar[0]/okcd") as GuiTextField;
-                if (okcdField != null)
-                    okcdField.Text = "COGI";
-            }, "Ingresar codigo de transaccion COGI");
-
-            // Presionar Enter
-            ExecuteSapCommand(() =>
-            {
-                var mainWindow = session.FindById("wnd[0]") as GuiFrameWindow;
-                mainWindow?.SendVKey(0);
-            }, "Ejecutar transaccion");
-            Thread.Sleep(1500);
-
-            // Ingresar centro 1815
-            ExecuteSapCommand(() =>
-            {
-                var werksField = session.FindById("wnd[0]/usr/ctxtS_WERKS-LOW") as GuiCTextField;
-                if (werksField != null)
-                    werksField.Text = "1815";
-            }, "Ingresar centro 1815");
-
-            // Presionar boton ejecutar (btn[8])
-            ExecuteSapCommand(() =>
-            {
-                var executeButton = session.FindById("wnd[0]/tbar[1]/btn[8]") as GuiButton;
-                executeButton?.Press();
-            }, "Ejecutar consulta");
-            Thread.Sleep(2000);
-
-            // Presionar boton exportar (btn[20])
-            ExecuteSapCommand(() =>
-            {
-                var exportButton = session.FindById("wnd[0]/tbar[1]/btn[20]") as GuiButton;
-                exportButton?.Press();
-            }, "Abrir dialogo de exportacion");
-            Thread.Sleep(1000);
-
-            // Confirmar exportacion (wnd[1]/tbar[0]/btn[0])
-            ExecuteSapCommand(() =>
-            {
-                var confirmButton = session.FindById("wnd[1]/tbar[0]/btn[0]") as GuiButton;
-                confirmButton?.Press();
-            }, "Confirmar tipo de exportacion");
-            Thread.Sleep(1000);
-
-            // Ingresar nombre de archivo
-            ExecuteSapCommand(() =>
-            {
-                var filenameField = session.FindById("wnd[1]/usr/ctxtDY_FILENAME") as GuiCTextField;
-                if (filenameField != null)
-                    filenameField.Text = "cogi.txt";
-            }, "Especificar nombre de archivo: cogi.txt");
-
-            // Guardar archivo (wnd[1]/tbar[0]/btn[11])
-            ExecuteSapCommand(() =>
-            {
-                var saveButton = session.FindById("wnd[1]/tbar[0]/btn[11]") as GuiButton;
-                saveButton?.Press();
-            }, "Guardar archivo");
-            Thread.Sleep(1500);
-
-            Console.WriteLine($"{Timestamp()} Script COGI ejecutado exitosamente.");
-            Console.WriteLine($"{Timestamp()} El archivo 'cogi.txt' deberia haberse generado en la ubicacion configurada en SAP.");
+            RunCogiExport(session);
         }
         finally
         {
@@ -236,19 +111,213 @@ internal static class Program
     }
 
     [SupportedOSPlatform("windows")]
-    private static void ExecuteSapCommand(Action command, string description)
+    private static GuiApplication GetSapApplication()
+    {
+        var sapGuiAuto = GetObject("SAPGUI") as GuiApplication;
+        if (sapGuiAuto == null)
+        {
+            throw new InvalidOperationException("No se pudo conectar a SAP GUI. Asegurese de que SAP GUI este abierto.");
+        }
+
+        var app = sapGuiAuto.GetScriptingEngine as GuiApplication;
+        if (app == null)
+        {
+            throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
+        }
+
+        Console.WriteLine($"{Timestamp()} SAP GUI encontrado.");
+        return app;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void RunCogiExport(GuiSession session)
+    {
+        const string transaction = "COGI";
+        const string plant = "1815";
+        const string exportFile = "cogi.txt";
+
+        Console.WriteLine($"{Timestamp()} Ejecutando transaccion {transaction}...");
+
+        ExecuteSapAction(session, "Maximizar ventana", () =>
+        {
+            FindById<GuiFrameWindow>(session, "wnd[0]")?.Maximize();
+        });
+
+        StartTransaction(session, transaction);
+        WaitUntilSessionReady(session, 10, $"Transaccion {transaction}");
+
+        ExecuteSapAction(session, "Ingresar centro", () =>
+        {
+            if (!TrySetText(session, "wnd[0]/usr/ctxtS_WERKS-LOW", plant))
+            {
+                TrySetText(session, "wnd[0]/usr/txtS_WERKS-LOW", plant);
+            }
+        });
+
+        ExecuteSapAction(session, "Ejecutar consulta", () =>
+        {
+            FindById<GuiButton>(session, "wnd[0]/tbar[1]/btn[8]")?.Press();
+        });
+        WaitUntilSessionReady(session, 15, "Resultado COGI");
+
+        ExecuteSapAction(session, "Abrir dialogo de exportacion", () =>
+        {
+            FindById<GuiButton>(session, "wnd[0]/tbar[1]/btn[20]")?.Press();
+        });
+        WaitUntilSessionReady(session, 5, "Dialogo exportacion");
+
+        ExecuteSapAction(session, "Confirmar formato de exportacion", () =>
+        {
+            FindById<GuiButton>(session, "wnd[1]/tbar[0]/btn[0]")?.Press();
+        });
+        WaitUntilSessionReady(session, 5, "Confirmar exportacion");
+
+        ExecuteSapAction(session, "Especificar nombre de archivo", () =>
+        {
+            TrySetText(session, "wnd[1]/usr/ctxtDY_FILENAME", exportFile);
+        });
+
+        ExecuteSapAction(session, "Guardar archivo", () =>
+        {
+            FindById<GuiButton>(session, "wnd[1]/tbar[0]/btn[11]")?.Press();
+        });
+        WaitUntilSessionReady(session, 15, "Guardar archivo");
+
+        Console.WriteLine($"{Timestamp()} Script COGI ejecutado exitosamente.");
+        Console.WriteLine($"{Timestamp()} El archivo '{exportFile}' deberia haberse generado en la ubicacion configurada en SAP.");
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void StartTransaction(GuiSession session, string transaction)
+    {
+        ExecuteSapAction(session, $"Ir a transaccion {transaction}", () =>
+        {
+            try
+            {
+                session.StartTransaction(transaction);
+            }
+            catch
+            {
+                var okcd = FindById<GuiTextField>(session, "wnd[0]/tbar[0]/okcd");
+                var wnd0 = FindById<GuiFrameWindow>(session, "wnd[0]");
+                if (okcd == null || wnd0 == null)
+                {
+                    throw new InvalidOperationException("No se pudo navegar a la transaccion solicitada.");
+                }
+
+                okcd.Text = transaction;
+                wnd0.SendVKey(0);
+            }
+        });
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void ExecuteSapAction(GuiSession session, string description, Action action)
     {
         try
         {
             Console.WriteLine($"{Timestamp()} -> {description}...");
-            command();
+            action();
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"{Timestamp()} Advertencia al ejecutar '{description}': {ex.Message}");
+            Console.WriteLine($"{Timestamp()} Error al ejecutar '{description}': {ex.Message}");
             Console.ResetColor();
             throw;
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void WaitUntilSessionReady(GuiSession session, int timeoutSeconds, string context)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            bool busy = false;
+            try
+            {
+                busy = session.Busy;
+            }
+            catch
+            {
+                // Ignorar y continuar intentando
+            }
+
+            if (!busy)
+            {
+                Thread.Sleep(300);
+                try
+                {
+                    busy = session.Busy;
+                }
+                catch
+                {
+                    busy = false;
+                }
+            }
+
+            if (!busy)
+            {
+                return;
+            }
+
+            Thread.Sleep(300);
+        }
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"{Timestamp()} Advertencia: Timeout esperando '{context}'.");
+        Console.ResetColor();
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static bool TrySetText(GuiSession session, string id, string value)
+    {
+        try
+        {
+            var obj = session.FindById(id, false);
+            if (obj == null)
+            {
+                return false;
+            }
+
+            switch (obj)
+            {
+                case GuiTextField textField:
+                    textField.Text = value;
+                    return true;
+                case GuiCTextField cTextField:
+                    cTextField.Text = value;
+                    return true;
+                default:
+                    try
+                    {
+                        dynamic dynamicObj = obj;
+                        dynamicObj.Text = value;
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static T? FindById<T>(GuiSession session, string id) where T : class
+    {
+        try
+        {
+            return session.FindById(id, false) as T;
+        }
+        catch
+        {
+            return null;
         }
     }
 
