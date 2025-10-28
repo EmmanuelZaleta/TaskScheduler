@@ -6,7 +6,9 @@ using SAPFEWSELib;
 // P/Invoke para GetActiveObject (no disponible en .NET 8)
 internal static class NativeMethods
 {
-    [DllImport("oleaut32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
+    // CLSIDFromProgID is exported by ole32.dll (not oleaut32.dll). Using the
+    // correct module prevents a runtime entry-point lookup failure on Windows.
+    [DllImport("ole32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
     private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid pclsid);
 
     [DllImport("ole32.dll", PreserveSig = true)]
