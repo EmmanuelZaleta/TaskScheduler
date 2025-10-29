@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
@@ -32,17 +33,29 @@ internal sealed class Ficq312SqlUploader
             return 0;
         }
 
-        var dt = BuildSchema();
-        int rows = ParseFile(filePath, dt);
-        if (rows == 0)
+        try
         {
-            ConsoleLogger.Warn("Archivo FICQ312 sin filas de datos.");
+            var dt = BuildSchema();
+            int rows = ParseFile(filePath, dt);
+            if (rows == 0)
+            {
+                ConsoleLogger.Warn("Archivo FICQ312 sin filas de datos.");
+                return 0;
+            }
+
+            // Asegurar que todas las columnas existen en la tabla de destino
+            EnsureColumnsExist(connStr!, table, dt);
+
+            BulkInsert(dt, connStr!, table);
+            ConsoleLogger.Success($"Carga FICQ312 a SQL exitosa: {rows} filas -> {table}");
+            return rows;
+        }
+        catch (Exception ex)
+        {
+            ConsoleLogger.Error($"Error al cargar FICQ312 a SQL: {ex.Message}");
+            ConsoleLogger.Debug($"Stack trace: {ex.StackTrace}");
             return 0;
         }
-
-        BulkInsert(dt, connStr!, table);
-        ConsoleLogger.Success($"Carga FICQ312 a SQL exitosa: {rows} filas -> {table}");
-        return rows;
     }
 
     private static DataTable BuildSchema()
@@ -113,17 +126,148 @@ internal sealed class Ficq312SqlUploader
 
     private static void BulkInsert(DataTable dt, string connStr, string table)
     {
-        using var cn = new SqlConnection(connStr);
-        cn.Open();
-        using var bulk = new SqlBulkCopy(cn)
+        try
         {
-            DestinationTableName = table,
-            BatchSize = 5000,
-            BulkCopyTimeout = 0
-        };
-        foreach (DataColumn c in dt.Columns)
-            bulk.ColumnMappings.Add(c.ColumnName, c.ColumnName);
-        bulk.WriteToServer(dt);
+            using var cn = new SqlConnection(connStr);
+            cn.Open();
+            using var bulk = new SqlBulkCopy(cn)
+            {
+                DestinationTableName = table,
+                BatchSize = 5000,
+                BulkCopyTimeout = 0
+            };
+            foreach (DataColumn c in dt.Columns)
+                bulk.ColumnMappings.Add(c.ColumnName, c.ColumnName);
+            bulk.WriteToServer(dt);
+        }
+        catch (SqlException ex)
+        {
+            ConsoleLogger.Error($"Error de SQL durante BulkInsert: {ex.Message}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            ConsoleLogger.Error($"Error durante BulkInsert: {ex.Message}");
+            throw;
+        }
+    }
+
+    private static void EnsureColumnsExist(string connStr, string tableName, DataTable schema)
+    {
+        try
+        {
+            using var cn = new SqlConnection(connStr);
+            cn.Open();
+
+            // Obtener columnas existentes en la tabla
+            var existingColumns = GetExistingColumns(cn, tableName);
+
+            // Determinar columnas faltantes
+            var missingColumns = new List<DataColumn>();
+            foreach (DataColumn col in schema.Columns)
+            {
+                if (!existingColumns.Contains(col.ColumnName, StringComparer.OrdinalIgnoreCase))
+                {
+                    missingColumns.Add(col);
+                }
+            }
+
+            // Crear columnas faltantes
+            if (missingColumns.Count > 0)
+            {
+                ConsoleLogger.Info($"Creando {missingColumns.Count} columna(s) faltante(s) en {tableName}...");
+                CreateMissingColumns(cn, tableName, missingColumns);
+                ConsoleLogger.Success($"{missingColumns.Count} columna(s) creada(s) exitosamente.");
+            }
+            else
+            {
+                ConsoleLogger.Debug($"Todas las columnas ya existen en {tableName}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ConsoleLogger.Error($"Error al verificar/crear columnas: {ex.Message}");
+            throw;
+        }
+    }
+
+    private static HashSet<string> GetExistingColumns(SqlConnection cn, string tableName)
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Parsear el nombre de la tabla para extraer schema y nombre
+        var parts = tableName.Split('.');
+        string schema = parts.Length > 1 ? parts[0] : "dbo";
+        string table = parts.Length > 1 ? parts[1] : tableName;
+
+        // Limpiar corchetes si existen
+        schema = schema.Trim('[', ']');
+        table = table.Trim('[', ']');
+
+        var query = @"
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @Schema AND TABLE_NAME = @Table";
+
+        using var cmd = new SqlCommand(query, cn);
+        cmd.Parameters.AddWithValue("@Schema", schema);
+        cmd.Parameters.AddWithValue("@Table", table);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            columns.Add(reader.GetString(0));
+        }
+
+        return columns;
+    }
+
+    private static void CreateMissingColumns(SqlConnection cn, string tableName, List<DataColumn> missingColumns)
+    {
+        foreach (var col in missingColumns)
+        {
+            try
+            {
+                // Determinar el tipo SQL basado en el tipo .NET
+                string sqlType = GetSqlType(col.DataType);
+
+                var alterSql = $"ALTER TABLE {tableName} ADD [{col.ColumnName}] {sqlType} NULL";
+
+                using var cmd = new SqlCommand(alterSql, cn);
+                cmd.ExecuteNonQuery();
+
+                ConsoleLogger.Debug($"  - Columna creada: {col.ColumnName} ({sqlType})");
+            }
+            catch (SqlException ex)
+            {
+                ConsoleLogger.Warn($"No se pudo crear columna {col.ColumnName}: {ex.Message}");
+                // Continuar con las demás columnas
+            }
+        }
+    }
+
+    private static string GetSqlType(Type netType)
+    {
+        // Mapeo de tipos .NET a tipos SQL
+        if (netType == typeof(string))
+            return "NVARCHAR(MAX)";
+        if (netType == typeof(int))
+            return "INT";
+        if (netType == typeof(long))
+            return "BIGINT";
+        if (netType == typeof(decimal))
+            return "DECIMAL(18,2)";
+        if (netType == typeof(double) || netType == typeof(float))
+            return "FLOAT";
+        if (netType == typeof(DateTime))
+            return "DATETIME";
+        if (netType == typeof(bool))
+            return "BIT";
+        if (netType == typeof(Guid))
+            return "UNIQUEIDENTIFIER";
+
+        // Por defecto, usar NVARCHAR(MAX) para tipos desconocidos
+        return "NVARCHAR(MAX)";
     }
 }
 
