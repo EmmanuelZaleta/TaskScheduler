@@ -71,6 +71,10 @@ internal sealed class Ficq312ExportService
         });
         WaitUntilReady(session, 12, "Resultado FICQ312");
 
+        // Esperar a que el grid cargue completamente los datos antes de exportar
+        ConsoleLogger.Info("-> Esperando a que los datos se carguen en el grid...");
+        Thread.Sleep(3000);
+
         // Resolver grid de resultados
         dynamic resultGrid = null;
         try { resultGrid = session.FindById("wnd[0]/usr/cntlCONTAINER/shellcont/shell", false); } catch { }
