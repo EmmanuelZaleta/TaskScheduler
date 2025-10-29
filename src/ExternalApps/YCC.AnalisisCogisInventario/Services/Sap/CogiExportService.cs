@@ -38,6 +38,10 @@ internal sealed class CogiExportService
         });
         WaitUntilReady(session, 15, "Resultado COGI");
 
+        // Esperar a que el grid cargue completamente los datos antes de exportar
+        ConsoleLogger.Info("-> Esperando a que los datos se carguen en el grid...");
+        Thread.Sleep(3000);
+
         // Exportar
         Execute("Abrir dialogo de exportacion", session, () =>
         {

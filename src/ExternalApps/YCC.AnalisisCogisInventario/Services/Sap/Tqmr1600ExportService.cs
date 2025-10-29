@@ -94,6 +94,10 @@ internal sealed class Tqmr1600ExportService
         Execute("Ejecutar consulta", session, () => { (session.FindById("wnd[0]/tbar[1]/btn[8]", false) as GuiButton)?.Press(); });
         WaitUntilReady(session, 10, "Resultado SE16N");
 
+        // Esperar a que el grid cargue completamente los datos antes de exportar
+        ConsoleLogger.Info("-> Esperando a que los datos se carguen en el grid...");
+        Thread.Sleep(3000);
+
         // Exportar
         Execute("Exportar a PC", session, () =>
         {
