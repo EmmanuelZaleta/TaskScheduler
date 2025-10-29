@@ -84,9 +84,9 @@ internal sealed class Lx03ExportService
             var dyFileT = dyFileC == null ? session.FindById("wnd[1]/usr/txtDY_FILENAME", false) as GuiTextField : null;
             if (dyFileC != null) { dynamic d = dyFileC; d.Text = exportName; try { d.CaretPosition = Math.Min(8, exportName.Length); } catch { } }
             else if (dyFileT != null) { dynamic d = dyFileT; d.Text = exportName; try { d.CaretPosition = Math.Min(8, exportName.Length); } catch { } }
+        (session.FindById("wnd[1]/tbar[0]/btn[11]", false) as GuiButton)?.Press();
         });
-        Execute(session, "Guardar archivo", () => { (session.FindById("wnd[1]/tbar[0]/btn[11]", false) as GuiButton)?.Press(); });
-        WaitUntilReady(session, 10, "Guardar LX03");
+        Task.Delay(5000).Wait();
 
         // Confirmar archivo
         if (WaitForFile(fullPath, 15)) ConsoleLogger.Success($"Archivo LX03 generado: {fullPath}");

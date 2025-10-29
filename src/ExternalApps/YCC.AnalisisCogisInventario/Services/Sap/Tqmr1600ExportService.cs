@@ -98,14 +98,11 @@ internal sealed class Tqmr1600ExportService
         ConsoleLogger.Info("-> Esperando a que los datos se carguen en el grid...");
         Thread.Sleep(3000);
 
-        // Exportar
-        Execute("Exportar a PC", session, () =>
-        {
-            dynamic grid = session.FindById("wnd[0]/usr/cntlRESULT_LIST/shellcont/shell", false);
-            grid.PressToolbarContextButton("&MB_EXPORT"); Thread.Sleep(200);
-            grid.SelectContextMenuItem("&PC");
-        });
-        WaitUntilReady(session, 5, "Dialogo exportacion SE16N");
+        // Exportar a PC
+        dynamic grid = session.FindById("wnd[0]/usr/cntlRESULT_LIST/shellcont/shell", false);
+        grid.PressToolbarContextButton("&MB_EXPORT");
+        Thread.Sleep(500);
+        grid.SelectContextMenuItem("&PC");
 
         Execute("Confirmar formato", session, () => { (session.FindById("wnd[1]/tbar[0]/btn[0]", false) as GuiButton)?.Press(); });
         WaitUntilReady(session, 5, "Confirmar formato SE16N");
