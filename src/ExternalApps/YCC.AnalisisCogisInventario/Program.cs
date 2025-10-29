@@ -1,341 +1,159 @@
-using System.Diagnostics;
-using System.Reflection;
-using System.Runtime.InteropServices;
+using System;
 using System.Runtime.Versioning;
-using System.Threading;
-using SAPFEWSELib;
+using YCC.AnalisisCogisInventario.Config;
+using YCC.AnalisisCogisInventario.Logging;
+using YCC.AnalisisCogisInventario.Services.Sap;
+using YCC.AnalisisCogisInventario.Services.Sql;
 
 internal static class Program
 {
+    [STAThread]
     public static int Main(string[] args)
     {
         if (!OperatingSystem.IsWindows())
         {
-            Console.Error.WriteLine($"{Timestamp()} Esta aplicacion requiere Windows para conectarse a SAP GUI.");
+            ConsoleLogger.Error("Esta aplicacion requiere Windows para conectarse a SAP GUI.");
             return 1;
         }
 
         Console.Title = $"YCC.AnalisisCogisInventario PID={Environment.ProcessId} {DateTime.Now:HH:mm:ss}";
-
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"{Timestamp()} Iniciando Analisis COGI de Inventario...");
-        Console.ResetColor();
-
-        Console.WriteLine($"{Timestamp()} WorkingDirectory: {Environment.CurrentDirectory}");
+        ConsoleLogger.Info("Iniciando Analisis COGI de Inventario...");
+        ConsoleLogger.Info($"WorkingDirectory: {Environment.CurrentDirectory}");
 
         try
         {
-            ExecuteCogiScript();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"{Timestamp()} Proceso completado exitosamente.");
-            Console.ResetColor();
+            var cfg = ConfigLoader.Load(args);
+            Execute(cfg);
+            ConsoleLogger.Success("Proceso completado exitosamente.");
             return 0;
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"{Timestamp()} Error: {ex.Message}");
-            Console.Error.WriteLine($"{Timestamp()} StackTrace: {ex.StackTrace}");
-            Console.ResetColor();
+            ConsoleLogger.Error($"Error: {ex.Message}");
+            ConsoleLogger.Error($"StackTrace: {ex.StackTrace}");
             return 1;
         }
     }
 
     [SupportedOSPlatform("windows")]
-    private static void ExecuteCogiScript()
+    private static void Execute(AppConfig cfg)
     {
-        Console.WriteLine($"{Timestamp()} Conectando a SAP GUI...");
+        ConsoleLogger.Info("Conectando a SAP GUI...");
 
-        GuiApplication? application = null;
-        GuiConnection? connection = null;
-        GuiSession? session = null;
-
+        var connector = new SapConnector();
+        object? app = null, conn = null, sess = null;
         try
         {
-            application = GetSapApplication();
+            var application = connector.GetApplication(); app = application;
+            var connection = connector.EnsureConnection(application, cfg); conn = connection;
+            var session = connector.EnsureSession(connection, cfg); sess = session;
+            connector.EnsureLogin(session, cfg);
 
-            if (application.Children.Count == 0)
-            {
-                throw new InvalidOperationException("No hay conexiones SAP abiertas. Por favor, inicie sesion en SAP primero.");
-            }
+            // Ejecutar primero FICQ312 y luego COGI, en la MISMA sesion
+            var ficq = new Ficq312ExportService();
+            var ficqPath = ficq.Run(session, cfg);
 
-            connection = application.Children.ElementAt(0) as GuiConnection
-                ?? throw new InvalidOperationException("No se pudo obtener la conexion SAP.");
-
-            Console.WriteLine($"{Timestamp()} Conexion encontrada: {TryGet(() => connection.Description) ?? "N/A"}");
-
-            if (connection.Children.Count == 0)
-            {
-                throw new InvalidOperationException("No hay sesiones activas en la conexion SAP.");
-            }
-
-            session = connection.Children.ElementAt(0) as GuiSession
-                ?? throw new InvalidOperationException("No se pudo obtener la sesion SAP.");
-
-            Console.WriteLine($"{Timestamp()} Sesion encontrada. Usuario: {TryGet(() => session.Info.User) ?? "desconocido"}");
-
-            RunCogiExport(session);
-        }
-        finally
-        {
-            ReleaseComObject(session);
-            ReleaseComObject(connection);
-            ReleaseComObject(application);
-        }
-    }
-
-    [SupportedOSPlatform("windows")]
-    private static GuiApplication GetSapApplication()
-    {
-        var rotType = Type.GetTypeFromProgID("SapROTWr.SapROTWrapper");
-        if (rotType is null)
-        {
-            throw new InvalidOperationException("No se encontro la libreria SapROTWr. Instala SAP GUI con scripting habilitado.");
-        }
-
-        dynamic? rot = null;
-        dynamic? rotEntry = null;
-        try
-        {
-            rot = Activator.CreateInstance(rotType);
-            if (rot is null)
-            {
-                throw new InvalidOperationException("No se pudo crear instancia de SapROTWr.SapROTWrapper.");
-            }
-
-            rotEntry = rot.GetROTEntry("SAPGUI");
-            if (rotEntry is null)
-            {
-                throw new InvalidOperationException("No se pudo obtener entrada SAP GUI del ROT. Asegurese de que SAP GUI este abierto.");
-            }
-
-            var scriptingEngine = rotEntry.GetScriptingEngine();
-            if (scriptingEngine is null)
-            {
-                throw new InvalidOperationException("No se pudo obtener el motor de scripting de SAP GUI.");
-            }
-
-            Console.WriteLine($"{Timestamp()} SAP GUI encontrado.");
-            return (GuiApplication)scriptingEngine;
-        }
-        finally
-        {
-            ReleaseComObject(rotEntry);
-            ReleaseComObject(rot);
-        }
-    }
-
-    [SupportedOSPlatform("windows")]
-    private static void RunCogiExport(GuiSession session)
-    {
-        const string transaction = "COGI";
-        const string plant = "1815";
-        const string exportFile = "cogi.txt";
-
-        Console.WriteLine($"{Timestamp()} Ejecutando transaccion {transaction}...");
-
-        ExecuteSapAction(session, "Maximizar ventana", () =>
-        {
-            FindById<GuiFrameWindow>(session, "wnd[0]")?.Maximize();
-        });
-
-        StartTransaction(session, transaction);
-        WaitUntilSessionReady(session, 10, $"Transaccion {transaction}");
-
-        ExecuteSapAction(session, "Ingresar centro", () =>
-        {
-            if (!TrySetText(session, "wnd[0]/usr/ctxtS_WERKS-LOW", plant))
-            {
-                TrySetText(session, "wnd[0]/usr/txtS_WERKS-LOW", plant);
-            }
-        });
-
-        ExecuteSapAction(session, "Ejecutar consulta", () =>
-        {
-            FindById<GuiButton>(session, "wnd[0]/tbar[1]/btn[8]")?.Press();
-        });
-        WaitUntilSessionReady(session, 15, "Resultado COGI");
-
-        ExecuteSapAction(session, "Abrir dialogo de exportacion", () =>
-        {
-            FindById<GuiButton>(session, "wnd[0]/tbar[1]/btn[20]")?.Press();
-        });
-        WaitUntilSessionReady(session, 5, "Dialogo exportacion");
-
-        ExecuteSapAction(session, "Confirmar formato de exportacion", () =>
-        {
-            FindById<GuiButton>(session, "wnd[1]/tbar[0]/btn[0]")?.Press();
-        });
-        WaitUntilSessionReady(session, 5, "Confirmar exportacion");
-
-        ExecuteSapAction(session, "Especificar nombre de archivo", () =>
-        {
-            TrySetText(session, "wnd[1]/usr/ctxtDY_FILENAME", exportFile);
-        });
-
-        ExecuteSapAction(session, "Guardar archivo", () =>
-        {
-            FindById<GuiButton>(session, "wnd[1]/tbar[0]/btn[11]")?.Press();
-        });
-        WaitUntilSessionReady(session, 15, "Guardar archivo");
-
-        Console.WriteLine($"{Timestamp()} Script COGI ejecutado exitosamente.");
-        Console.WriteLine($"{Timestamp()} El archivo '{exportFile}' deberia haberse generado en la ubicacion configurada en SAP.");
-    }
-
-    [SupportedOSPlatform("windows")]
-    private static void StartTransaction(GuiSession session, string transaction)
-    {
-        ExecuteSapAction(session, $"Ir a transaccion {transaction}", () =>
-        {
+            // Carga a SQL opcional para FICQ312
             try
             {
-                session.StartTransaction(transaction);
-            }
-            catch
-            {
-                var okcd = FindById<GuiTextField>(session, "wnd[0]/tbar[0]/okcd");
-                var wnd0 = FindById<GuiFrameWindow>(session, "wnd[0]");
-                if (okcd == null || wnd0 == null)
+                var ficqUploader = new Ficq312SqlUploader();
+                var rows = ficqUploader.Upload(ficqPath, cfg);
+                if (rows > 0)
                 {
-                    throw new InvalidOperationException("No se pudo navegar a la transaccion solicitada.");
+                    // SP de propagacion para FICQ312
+                    try { StoredProcExecutor.Execute(cfg.SqlConnection, "sp_Ficq312_propagar"); }
+                    catch (Exception spEx) { ConsoleLogger.Warn($"SP FICQ312 fallo: {spEx.Message}"); }
                 }
-
-                okcd.Text = transaction;
-                wnd0.SendVKey(0);
             }
-        });
-    }
+            catch (Exception ex)
+            {
+                ConsoleLogger.Warn($"No se pudo cargar FICQ312 a SQL: {ex.Message}");
+            }
 
-    [SupportedOSPlatform("windows")]
-    private static void ExecuteSapAction(GuiSession session, string description, Action action)
-    {
-        try
-        {
-            Console.WriteLine($"{Timestamp()} -> {description}...");
-            action();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"{Timestamp()} Error al ejecutar '{description}': {ex.Message}");
-            Console.ResetColor();
-            throw;
-        }
-    }
+            var export = new CogiExportService();
+            var cogiPath = export.Run(session, cfg);
 
-    [SupportedOSPlatform("windows")]
-    private static void WaitUntilSessionReady(GuiSession session, int timeoutSeconds, string context)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            bool busy = false;
+            // Carga a SQL opcional para COGI
+            var uploader = new CogiSqlUploader();
+            var cogiRows = uploader.Upload(cogiPath, cfg);
+            if (cogiRows > 0)
+            {
+                // SP de propagacion para COGI
+                try { StoredProcExecutor.Execute(cfg.SqlConnection, "sp_cogi_propagar"); }
+                catch (Exception spEx) { ConsoleLogger.Warn($"SP COGI fallo: {spEx.Message}"); }
+            }
+
+            // Ejecutar LX03 (misma sesion) y exportar usando lista de materiales desde dbo.COGI
             try
             {
-                busy = session.Busy;
-            }
-            catch
+            // Ejecutar TQMR1600 (SE16N) antes de LX03
+            try
             {
-                // Ignorar y continuar intentando
-            }
-
-            if (!busy)
-            {
-                Thread.Sleep(300);
+                var tqmr = new Tqmr1600ExportService();
+                var tqmrPath = tqmr.Run(session, cfg);
                 try
                 {
-                    busy = session.Busy;
+                    var tqmrUploader = new Tqmr1600SqlUploader();
+                    var tqmrRows = tqmrUploader.Upload(tqmrPath, cfg);
+                    if (tqmrRows > 0)
+                    {
+                        // Ejecutar SP de propagación para TQMR1600
+                        try { StoredProcExecutor.Execute(cfg.SqlConnection, "sp_TQMR1600_propagar"); }
+                        catch (Exception spEx) { ConsoleLogger.Warn($"SP TQMR1600 fallo: {spEx.Message}"); }
+                    }
                 }
-                catch
+                catch (Exception upSe) { ConsoleLogger.Warn($"No se pudo cargar TQMR1600 a SQL: {upSe.Message}"); }
+            }
+            catch (Exception exSe) { ConsoleLogger.Warn($"TQMR1600 fallo: {exSe.Message}"); }
+
+                var lx03 = new Lx03ExportService();
+                var lx03Path = lx03.Run(session, cfg);
+
+                // Cargar LX03 a SQL (RAW por linea)
+                try
                 {
-                    busy = false;
+                    var lx03Uploader = new Lx03SqlUploader();
+                    var lxRows = lx03Uploader.Upload(lx03Path, cfg);
+                    if (lxRows > 0)
+                    {
+                        // SP de propagacion para LX03 y luego el total
+                        try { StoredProcExecutor.Execute(cfg.SqlConnection, "sp_lx03_propagar"); }
+                        catch (Exception spEx) { ConsoleLogger.Warn($"SP LX03 fallo: {spEx.Message}"); }
+
+                        try { StoredProcExecutor.Execute(cfg.SqlConnection, "sp_AnalisisCogisInventario_propagar_todo"); }
+                        catch (Exception spEx) { ConsoleLogger.Warn($"SP global fallo: {spEx.Message}"); }
+                    }
+                }
+                catch (Exception ex2)
+                {
+                    ConsoleLogger.Warn($"No se pudo cargar LX03 a SQL: {ex2.Message}");
                 }
             }
-
-            if (!busy)
+            catch (Exception ex)
             {
-                return;
-            }
-
-            Thread.Sleep(300);
-        }
-
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"{Timestamp()} Advertencia: Timeout esperando '{context}'.");
-        Console.ResetColor();
-    }
-
-    [SupportedOSPlatform("windows")]
-    private static bool TrySetText(GuiSession session, string id, string value)
-    {
-        try
-        {
-            var obj = session.FindById(id, false);
-            if (obj == null)
-            {
-                return false;
-            }
-
-            switch (obj)
-            {
-                case GuiTextField textField:
-                    textField.Text = value;
-                    return true;
-                case GuiCTextField cTextField:
-                    cTextField.Text = value;
-                    return true;
-                default:
-                    try
-                    {
-                        dynamic dynamicObj = obj;
-                        dynamicObj.Text = value;
-                        return true;
-                    }
-                    catch
-                    {
-                        return false;
-                    }
+                ConsoleLogger.Warn($"LX03 fallo: {ex.Message}");
             }
         }
-        catch
+        finally
         {
-            return false;
+            try
+            {
+                if (cfg.CloseSessionOnExit && sess is SAPFEWSELib.GuiSession gs)
+                {
+                    SapSessionCloser.CloseGracefully(gs);
+                }
+            }
+            catch { }
+            TryRelease(sess);
+            TryRelease(conn);
+            TryRelease(app);
         }
     }
 
-    [SupportedOSPlatform("windows")]
-    private static T? FindById<T>(GuiSession session, string id) where T : class
-    {
-        try
-        {
-            return session.FindById(id, false) as T;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static void ReleaseComObject(object? value)
+    private static void TryRelease(object? value)
     {
         if (value is null) return;
-        try
-        {
-            if (Marshal.IsComObject(value))
-                Marshal.ReleaseComObject(value);
-        }
-        catch
-        {
-            // best-effort
-        }
+        try { if (System.Runtime.InteropServices.Marshal.IsComObject(value)) System.Runtime.InteropServices.Marshal.ReleaseComObject(value); }
+        catch { }
     }
-
-    private static T? TryGet<T>(Func<T> getter)
-    {
-        try { return getter(); }
-        catch { return default; }
-    }
-
-    private static string Timestamp() => $"[{DateTime.Now:HH:mm:ss}]";
 }
