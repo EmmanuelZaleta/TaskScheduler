@@ -76,7 +76,15 @@ internal sealed class Lx03SqlUploader
         using var cn = new SqlConnection(connStr);
         cn.Open();
 
-        SafeEnsureTableWithColumns(cn, table, headerCols); // no detiene si falla
+        var tablesToEnsure = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            table,
+            "dbo.LX03",
+            "dbo.LX03_Tran"
+        };
+
+        foreach (var tbl in tablesToEnsure)
+            SafeEnsureTableWithColumns(cn, tbl, headerCols); // no detiene si falla
 
         // 4) Mapear solo columnas que existan en destino
         var destCols = SafeGetExistingColumns(cn, table);
