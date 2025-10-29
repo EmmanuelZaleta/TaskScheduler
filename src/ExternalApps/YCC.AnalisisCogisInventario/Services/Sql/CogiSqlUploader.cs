@@ -11,7 +11,7 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
 {
     internal sealed class CogiSqlUploader
     {
-        // Orden clásico fallback (si no detecta encabezado)
+        // Orden clï¿½sico fallback (si no detecta encabezado)
         private static readonly string[] ClassicOrder15 =
         {
             "Material","Material Description","Plnt","SLoc","Quantity","EUn","Counter","MvT",
@@ -37,10 +37,10 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
             // 1) Detectar encabezado y datos
             if (!TryReadHeader(filePath, out var headerCols, out var dataLines))
             {
-                ConsoleLogger.Warn("No se detectó encabezado; usando orden clásico COGI (15/16).");
+                ConsoleLogger.Warn("No se detectï¿½ encabezado; usando orden clï¿½sico COGI (15/16).");
                 if (!TryReadDataWithClassic(filePath, out headerCols, out dataLines))
                 {
-                    ConsoleLogger.Warn("Archivo sin filas válidas.");
+                    ConsoleLogger.Warn("Archivo sin filas vï¿½lidas.");
                     return 0;
                 }
             }
@@ -62,7 +62,7 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
             }
             if (rows == 0)
             {
-                ConsoleLogger.Warn("Archivo sin filas válidas para cargar.");
+                ConsoleLogger.Warn("Archivo sin filas vï¿½lidas para cargar.");
                 return 0;
             }
 
@@ -92,7 +92,7 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
             foreach (var c in usable)
                 bulk.ColumnMappings.Add(c, c);
 
-            // copiar sólo las columnas mapeadas
+            // copiar sï¿½lo las columnas mapeadas
             var dtCopy = dt.DefaultView.ToTable(false, usable.ToArray());
             bulk.WriteToServer(dtCopy);
 
@@ -192,7 +192,7 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
             foreach (var c in cells)
             {
                 var t = (c ?? string.Empty).Trim();
-                if (t.Length == 0) continue;      // descarta vacíos
+                if (t.Length == 0) continue;      // descarta vacï¿½os
                 list.Add(t);
             }
             return list;
@@ -222,7 +222,7 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
             }
             catch (Exception ex)
             {
-                ConsoleLogger.Warn($"Ensure columnas falló en {tableName}: {ex.Message}");
+                ConsoleLogger.Warn($"Ensure columnas fallï¿½ en {tableName}: {ex.Message}");
                 // Sigue: no detenemos el flujo
             }
         }
@@ -249,7 +249,7 @@ namespace YCC.AnalisisCogisInventario.Services.Sql
 
             var createSql =
 $@"
-IF OBJECT_ID(N{SqlLit(tableName)}, 'U') IS NULL
+IF OBJECT_ID({SqlLit(tableName)}, 'U') IS NULL
 BEGIN
     EXEC(N'{SqlStr(createBody)}');
 END;
@@ -262,7 +262,7 @@ END;
                 var alterBody = $"ALTER TABLE {twoPart} ADD {QuoteIdent(col)} NVARCHAR(MAX) NULL";
                 var addSql =
 $@"
-IF COL_LENGTH(N{SqlLit(tableName)}, N{SqlLit(col)}) IS NULL
+IF COL_LENGTH({SqlLit(tableName)}, {SqlLit(col)}) IS NULL
 BEGIN
     BEGIN TRY
         EXEC(N'{SqlStr(alterBody)}');
@@ -295,7 +295,7 @@ END;
 
         private static string QuoteIdent(string name)
         {
-            // [A] -> [A]; maneja corchetes y deja cualquier carácter dentro
+            // [A] -> [A]; maneja corchetes y deja cualquier carï¿½cter dentro
             var safe = (name ?? string.Empty).Replace("]", "]]");
             return $"[{safe}]";
         }
