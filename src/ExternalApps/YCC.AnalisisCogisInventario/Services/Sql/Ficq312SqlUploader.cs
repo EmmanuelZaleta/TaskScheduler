@@ -35,15 +35,27 @@ internal sealed class Ficq312SqlUploader
 
         try
         {
-            var dt = BuildSchema();
-            int rows = ParseFile(filePath, dt);
+            // Primero leer el encabezado del archivo para crear el esquema dinámicamente
+            var columnHeaders = ReadColumnHeaders(filePath);
+            if (columnHeaders == null || columnHeaders.Count == 0)
+            {
+                ConsoleLogger.Warn("No se pudo leer el encabezado del archivo FICQ312.");
+                return 0;
+            }
+
+            var dt = BuildDynamicSchema(columnHeaders);
+            int rows = ParseFileByColumnName(filePath, dt, columnHeaders);
             if (rows == 0)
             {
                 ConsoleLogger.Warn("Archivo FICQ312 sin filas de datos.");
                 return 0;
             }
 
-            // Asegurar que todas las columnas existen en la tabla de destino
+            // Asegurar que todas las columnas existen en AMBAS tablas: FICQ312_Tran y FICQ312
+            EnsureColumnsExist(connStr!, "dbo.FICQ312_Tran", dt);
+            EnsureColumnsExist(connStr!, "dbo.FICQ312", dt);
+
+            // Insertar en la tabla configurada
             EnsureColumnsExist(connStr!, table, dt);
 
             BulkInsert(dt, connStr!, table);
@@ -58,69 +70,115 @@ internal sealed class Ficq312SqlUploader
         }
     }
 
-    private static DataTable BuildSchema()
+    /// <summary>
+    /// Lee el encabezado del archivo SAP para obtener los nombres de las columnas
+    /// </summary>
+    private static List<string>? ReadColumnHeaders(string path)
+    {
+        try
+        {
+            foreach (var raw in File.ReadLines(path))
+            {
+                var line = raw.TrimEnd();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (!line.StartsWith("|")) continue;
+                if (line.StartsWith("|---")) continue; // separador
+
+                // Buscar la línea de encabezado
+                if (line.IndexOf("Plnt", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    line.IndexOf("Material", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var payload = line.Trim('|');
+                    var headers = payload.Split('|')
+                        .Select(h => h.Trim())
+                        .Where(h => !string.IsNullOrWhiteSpace(h))
+                        .ToList();
+
+                    ConsoleLogger.Debug($"Encabezados encontrados: {string.Join(", ", headers)}");
+                    return headers;
+                }
+            }
+
+            ConsoleLogger.Warn("No se encontró línea de encabezado en el archivo FICQ312");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            ConsoleLogger.Error($"Error al leer encabezados: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Construye el esquema del DataTable basado en las columnas del archivo
+    /// </summary>
+    private static DataTable BuildDynamicSchema(List<string> columnHeaders)
     {
         var dt = new DataTable();
-        dt.Columns.Add("Plnt", typeof(string));
-        dt.Columns.Add("Material", typeof(string));
-        dt.Columns.Add("SPT", typeof(string));
-        dt.Columns.Add("Created", typeof(string));
-        dt.Columns.Add("Time", typeof(string));
-        dt.Columns.Add("CreatedBy", typeof(string));
-        dt.Columns.Add("SLoc", typeof(string));
-        dt.Columns.Add("Order", typeof(string));
-        dt.Columns.Add("MvT", typeof(string));
-        dt.Columns.Add("Quantity", typeof(string));
-        dt.Columns.Add("EUn", typeof(string));
-        dt.Columns.Add("Amount", typeof(string));
-        dt.Columns.Add("Crcy", typeof(string));
-        dt.Columns.Add("ErrorMessage", typeof(string));
-        dt.Columns.Add("Assembly", typeof(string));
-        dt.Columns.Add("AssemblyMaterialNumber", typeof(string));
-        dt.Columns.Add("Backflush", typeof(string));
-        dt.Columns.Add("MStatus", typeof(string));
+
+        // Crear una columna para cada encabezado encontrado
+        foreach (var header in columnHeaders)
+        {
+            // Todas las columnas son strings (NVARCHAR(MAX) en SQL)
+            dt.Columns.Add(header, typeof(string));
+        }
+
+        ConsoleLogger.Debug($"Esquema creado con {dt.Columns.Count} columnas");
         return dt;
     }
 
-    private static int ParseFile(string path, DataTable dt)
+    /// <summary>
+    /// Parsea el archivo usando los nombres de columna en lugar de posiciones fijas
+    /// </summary>
+    private static int ParseFileByColumnName(string path, DataTable dt, List<string> columnHeaders)
     {
         int count = 0;
+        bool headerFound = false;
+
         foreach (var raw in File.ReadLines(path))
         {
             var line = raw.TrimEnd();
             if (string.IsNullOrWhiteSpace(line)) continue;
             if (!line.StartsWith("|")) continue;
             if (line.StartsWith("|---")) continue; // separador
-            if (line.IndexOf("Plnt", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                line.IndexOf("Material", StringComparison.OrdinalIgnoreCase) >= 0)
-                continue; // encabezado
+
+            // Saltar el encabezado
+            if (!headerFound && (line.IndexOf("Plnt", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                line.IndexOf("Material", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                headerFound = true;
+                continue;
+            }
+
+            if (!headerFound) continue; // Seguir buscando el encabezado
 
             var payload = line.Trim('|');
             var parts = payload.Split('|').Select(p => p.Trim()).ToArray();
-            if (parts.Length < 18) continue;
+
+            // Validar que tengamos al menos tantas partes como columnas
+            if (parts.Length < columnHeaders.Count)
+            {
+                ConsoleLogger.Debug($"Línea omitida: tiene {parts.Length} columnas, se esperaban {columnHeaders.Count}");
+                continue;
+            }
 
             var row = dt.NewRow();
-            row["Plnt"] = parts[0];
-            row["Material"] = parts[1];
-            row["Quantity"] = parts[2];
-            row["EUn"] = parts[3];
-            row["Amount"] = parts[4];
-            row["Created"] = parts[5];
-            row["Time"] = parts[6];
-            row["SPT"] = parts[7];
-            row["CreatedBy"] = parts[8];
-            row["SLoc"] = parts[9];
-            row["Order"] = parts[10];
-            row["MvT"] = parts[11];
-            row["Crcy"] = parts[12];
-            row["ErrorMessage"] = parts[13];
-            row["Assembly"] = parts[14];
-            row["AssemblyMaterialNumber"] = parts[15];
-            row["Backflush"] = parts[16];
-            row["MStatus"] = parts[17];
+
+            // Mapear cada valor a su columna correspondiente por nombre
+            for (int i = 0; i < columnHeaders.Count && i < parts.Length; i++)
+            {
+                var columnName = columnHeaders[i];
+                if (dt.Columns.Contains(columnName))
+                {
+                    row[columnName] = parts[i];
+                }
+            }
+
             dt.Rows.Add(row);
             count++;
         }
+
+        ConsoleLogger.Debug($"Parseadas {count} filas de datos");
         return count;
     }
 
